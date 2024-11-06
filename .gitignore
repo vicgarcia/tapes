@@ -1,0 +1,20 @@
+# js app build
+node_modules
+dist
+
+# env config
+.env
+
+# log output
+logs
+*.log
+*.log*
+
+# compiled binary
+tapes
+
+# local path (used in development)
+.local
+
+# junk
+.DS_Store

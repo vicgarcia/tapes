@@ -1,0 +1,50 @@
+@import 'bootstrap/scss/bootstrap.scss';
+
+/* kill focus outlines */
+
+*:focus {
+    box-shadow: none !important;
+}
+
+.btn, .form-select {
+    &:hover {
+        background-color: var(--bs-btn-bg);
+        color: var(--bs-btn-color);
+    }
+    &:focus {
+        border-color: none;
+        background-color: var(--bs-btn-bg);
+        color: var(--bs-btn-color);
+    }
+    &.active {
+        &:hover {
+            background-color: var(--bs-btn-active-bg);
+            color: var(--bs-btn-active-color);
+        }
+        &:focus {
+            background-color: var(--bs-btn-active-bg);
+            color: var(--bs-btn-active-color);
+        }
+    }
+}
+
+.form-select, .form-select:focus {
+    border-color: var(--bs-btn-active-color)
+}
+
+.form-control, .form-control:focus {
+    border-color: var(--bs-btn-active-color)
+}
+
+
+/* thumbnail size */
+
+.thumbnail {
+    max-width: 100%;
+}
+
+/* transform text to uppercase */
+
+.uppercase {
+    text-transform: uppercase;
+}
