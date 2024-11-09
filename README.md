@@ -6,18 +6,16 @@ I'm running this on a Debian 12 server.
 
 FFMpeg is used for a bunch of things. Most visibly, it's being used to capture the rtsp to 15 minute video recordings.
 
-install ffmpeg
+Install ffmpeg
 ```
 sudo apt install ffmpeg
 ```
-
-
 
 ### MediaMTX
 
 MediaMTX is used to proxy the RTSP stream from the individual cameras. This allows a single connection to the camera across the network with multiple connections to the proxy from processes running on this machine.
 
-install mediamtx
+Install mediamtx
 ```
 sudo su
 mkdir /opt/mediamtx
@@ -28,7 +26,7 @@ exit
 
 https://github.com/bluenviron/mediamtx
 
-add configuration for a camera in mediamtx.yml
+Add configuration for a camera in mediamtx.yml
 ```
   cameraname:
     source: rtsp://user:password@192.168.100.101:554/live/ch0
@@ -44,7 +42,7 @@ Additionally, we're using the `runOnReady` config to run ffmpeg to capture archi
 
 HomeBridge is used to expose the cameras for real time viewing in Apple HomeKit.
 
-install homebridge
+Install homebridge
 ```
 cd /tmp
 curl -sSfL https://repo.homebridge.io/KEY.gpg | sudo gpg --dearmor | sudo tee /usr/share/keyrings/homebridge.gpg  > /dev/null
@@ -57,9 +55,9 @@ https://github.com/homebridge/homebridge/wiki
 
 Setup after install via ui @ http://<server ip>:8581
 
-add the "Homebridge Camera FFmpeg" plugin via search
+Add the "Homebridge Camera FFmpeg" plugin via search
 
-add cameras in plugin config json
+Add cameras in plugin config json
 ```
   {
     "name": "cameraname",
@@ -73,50 +71,47 @@ add cameras in plugin config json
 
 Tapes is used to provide a web application for browsing and viewing video recordings.
 
-install htpasswd to generate the auth database
+Clone the repository
 ```
-```
-
-clone the repository
-```
+git clone git@github.com:vicgarcia/tapes.git
 ```
 
-setup node and golang
-```
+To setup for local development, see the Dockerfile for dependencies.
+
+The `Dockerfile` in this repository is used to build an image with the necessary tools install to build the `tapes` application. This includes Node, Golang, and OpenCV.
 
 ```
-
-run build script to build the app
-```
-./build.sh
+docker build -t tapes-builder .
 ```
 
-setup and build the user interface with node 22
-```
-cd ui
-npm install
-npm run build
-```
+Once the container is built, it can be run to build the `tapes` application. The binary executable will be available in the root of this repository once complete. Once built, the application can be installed.
 
-
-install the application
-
+Install tapes
 ```
+sudo su
 mkdir /opt/tapes
 ```
 
-setup env vars
+Copy tapes from wherever it's built to /opt/tapes/tapes
+
+install htpasswd to generate the auth database
 ```
-cp env.template /opt/tapes/env
+sudo apt install apache2-utils
 ```
 
+Setup env vars
+```
+vim /opt/tapes/env
+---
+RECORDING_PATH=/opt/recordings
+PASSWORDS_PATH=/opt/tapes/passwords
+JWT_KEY=<random 64 char string>
+```
 
+Run tapes
+```
+cd /opt/tapes
+./tapes
+```
 
-
-
-
-
-
-
-
-
+Running this as a service is left to your imagination.

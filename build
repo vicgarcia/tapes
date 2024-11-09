@@ -1,11 +1,12 @@
 #!/bin/bash
 
 pushd ui
+npm install
 npm run build
 popd
 
 pushd api
-go build
+go build tapes.go
 popd
 
 mv api/tapes .
