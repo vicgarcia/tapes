@@ -11,11 +11,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/login': {
-        target: 'http://localhost:8080/',
+        target: 'http://localhost:8633/',
         changeOrigin: true
       },
       '/cameras': {
-        target: 'http://localhost:8080/',
+        target: 'http://localhost:8633/',
         changeOrigin: true
       }
     }
