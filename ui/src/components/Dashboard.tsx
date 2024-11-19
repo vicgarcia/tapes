@@ -44,7 +44,7 @@ export function Dashboard() {
             </Col>
         </> : <>
             <Col xs={12} lg={4} className='text-end'>
-                <Button size='md' className='uppercase' style={{width: '200px'}}
+                <Button size='sm' className='uppercase p-2' style={{width: '200px'}}
                     variant='outline-secondary'
                     onClick={_ => setActive(null)}
                 >back</Button>
