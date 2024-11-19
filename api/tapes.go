@@ -225,7 +225,6 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
     passwd, err := getPasswd()
     if err != nil {
-
         http.Error(writer, "error validating password", http.StatusInternalServerError)
         return
     }
@@ -285,6 +284,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
     camera, err := getCamera(cameraName)
     if err != nil {
         http.Error(writer, "invalid camera", http.StatusBadRequest)
+        return
     }
 
     day := request.URL.Query().Get("day")
@@ -336,6 +336,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
         _, err = os.Stat(videoPath)
         if err != nil {
             http.Error(writer, "video does not exist", http.StatusNotFound)
+            return
         }
 
         // open video file
@@ -378,12 +379,14 @@ func videoHandler(writer http.ResponseWriter, request *http.Request) {
     camera, err := getCamera(cameraName)
     if err != nil {
         http.Error(writer, "invalid camera", http.StatusBadRequest)
+        return
     }
 
     videoPath := filepath.Join(camera.Path, timestamp + ".mp4")
     _, err = os.Stat(videoPath)
     if err != nil {
         http.Error(writer, "video does not exist", http.StatusNotFound)
+        return
     }
 
     http.ServeFile(writer, request, videoPath)
@@ -404,6 +407,7 @@ func main() {
     err := godotenv.Load(".env")
     if err != nil {
         log.Fatalf("Error loading .env file: %v", err)
+        return
     }
 
     // static filesystem
@@ -427,4 +431,3 @@ func main() {
 
     log.Fatal(srv.ListenAndServe())
 }
-
