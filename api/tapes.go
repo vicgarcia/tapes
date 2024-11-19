@@ -340,7 +340,10 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
         }
 
         // open video file
+
         video, err := gocv.OpenVideoCapture(videoPath)
+        defer video.Close()
+
         if err != nil {
             http.Error(writer, err.Error(), http.StatusInternalServerError)
             return
