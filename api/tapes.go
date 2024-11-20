@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io/fs"
 	"log"
 	"net/http"
@@ -338,7 +339,6 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		}
 
 		// open video file
-
 		video, err := gocv.OpenVideoCapture(videoPath)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -361,7 +361,20 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 			return
 		}
 
-		gocv.IMWrite(thumbnailPath, frame)
+		height := frame.Rows()
+		width := frame.Cols()
+
+		newWidth := 500
+		newHeight := int(float64(height) * (float64(newWidth) / float64(width)))
+
+		resized := gocv.NewMatWithSize(newHeight, newWidth, frame.Type())
+		defer resized.Close()
+
+		gocv.Resize(frame, &resized, image.Point{X: newWidth, Y: newHeight}, 0, 0, gocv.InterpolationLinear)
+
+		params := []int{gocv.IMWriteJpegQuality, 70, gocv.IMWriteJpegOptimize, 1}
+
+		gocv.IMWriteWithParams(thumbnailPath, resized, params)
 	}
 
 	http.ServeFile(writer, request, thumbnailPath)
