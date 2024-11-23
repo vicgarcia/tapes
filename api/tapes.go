@@ -131,9 +131,9 @@ func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func getRecordingsPath() (string, error) {
-	recordingsPath := os.Getenv("RECORDING_PATH")
+	recordingsPath := os.Getenv("RECORDINGS_PATH")
 	if recordingsPath == "" {
-		return "", fmt.Errorf("missing RECORDING_PATH environment variable")
+		return "", fmt.Errorf("missing RECORDINGS_PATH environment variable")
 	}
 
 	return recordingsPath, nil
