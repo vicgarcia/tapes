@@ -60,7 +60,6 @@ export function Dashboard() {
                 <VideoPlayer
                     camera={selectedCamera!}
                     timestamp={active}
-                    setActive={setActive}
                 />
             </> : <>
                 <Row>
