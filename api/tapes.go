@@ -210,6 +210,65 @@ func getRecordingsByDay(camera Camera, day string) ([]Recording, error) {
 	return recordings, nil
 }
 
+func getVideoPath(camera Camera, timestamp string) (string, error) {
+	videoPath := filepath.Join(camera.Path, timestamp+".mp4")
+	_, err := os.Stat(videoPath)
+	return videoPath, err
+}
+
+func getThumbnailPath(camera Camera, timestamp string) (string, error) {
+
+	// check if thumbnail already exists
+	thumbnailPath := filepath.Join(camera.Path, timestamp+".jpg")
+	_, err := os.Stat(thumbnailPath)
+	if err == nil {
+		return thumbnailPath, nil
+	}
+
+	// open video file
+	videoPath, err := getVideoPath(camera, timestamp)
+	if err != nil {
+		return "", errors.New("video file does not exist")
+	}
+
+	video, err := gocv.OpenVideoCapture(videoPath)
+	if err != nil {
+		return "", errors.New("error opening video file")
+	}
+	defer video.Close()
+
+	// read frame
+	frame := gocv.NewMat()
+	defer frame.Close()
+	if ok := video.Read(&frame); !ok {
+		return "", errors.New("error reading video frame")
+	}
+	if frame.Empty() {
+		return "", errors.New("video frame has no data")
+	}
+
+	// calculate size based on width of 500 and maintaining aspect ratio
+
+	height := frame.Rows()
+	width := frame.Cols()
+
+	newWidth := 500
+	newHeight := int(float64(height) * (float64(newWidth) / float64(width)))
+
+	resized := gocv.NewMatWithSize(newHeight, newWidth, frame.Type())
+	defer resized.Close()
+
+	gocv.Resize(frame, &resized, image.Point{X: newWidth, Y: newHeight}, 0, 0, gocv.InterpolationLinear)
+
+	// create thumbnail and save
+	params := []int{gocv.IMWriteJpegQuality, 70, gocv.IMWriteJpegOptimize, 1}
+	if !gocv.IMWriteWithParams(thumbnailPath, resized, params) {
+		return "", errors.New("failed to write thumbnail")
+	}
+
+	return thumbnailPath, nil
+}
+
 // ----- handlers -----
 
 // health check endpoint
@@ -319,62 +378,16 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 	}
 
-	thumbnailPath := filepath.Join(camera.Path, timestamp+".jpg")
+	// check if the video file exists outside of getThumbnailPath to manage error status
+	_, err = getVideoPath(camera, timestamp)
+	if err != nil {
+		http.Error(writer, "video file does not exist", http.StatusNotFound)
+	}
 
-	_, thumbnailExistsErr := os.Stat(thumbnailPath)
-	if thumbnailExistsErr != nil {
-
-		// if the error is not due to file existance return error response
-		if !errors.Is(thumbnailExistsErr, os.ErrNotExist) {
-			http.Error(writer, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// check video file exists
-		videoPath := filepath.Join(camera.Path, timestamp+".mp4")
-		_, err = os.Stat(videoPath)
-		if err != nil {
-			http.Error(writer, "video does not exist", http.StatusNotFound)
-			return
-		}
-
-		// open video file
-		video, err := gocv.OpenVideoCapture(videoPath)
-		if err != nil {
-			http.Error(writer, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer video.Close()
-
-		// read frame and write to image file
-
-		frame := gocv.NewMat()
-		defer frame.Close()
-
-		if ok := video.Read(&frame); !ok {
-			http.Error(writer, "error reading video frame", http.StatusInternalServerError)
-			return
-		}
-
-		if frame.Empty() {
-			http.Error(writer, "video frame has not data", http.StatusInternalServerError)
-			return
-		}
-
-		height := frame.Rows()
-		width := frame.Cols()
-
-		newWidth := 500
-		newHeight := int(float64(height) * (float64(newWidth) / float64(width)))
-
-		resized := gocv.NewMatWithSize(newHeight, newWidth, frame.Type())
-		defer resized.Close()
-
-		gocv.Resize(frame, &resized, image.Point{X: newWidth, Y: newHeight}, 0, 0, gocv.InterpolationLinear)
-
-		params := []int{gocv.IMWriteJpegQuality, 70, gocv.IMWriteJpegOptimize, 1}
-
-		gocv.IMWriteWithParams(thumbnailPath, resized, params)
+	// get the thumbnail, will be created if it does not already exist
+	thumbnailPath, err := getThumbnailPath(camera, timestamp)
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
 	}
 
 	http.ServeFile(writer, request, thumbnailPath)
@@ -394,11 +407,9 @@ func videoHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	videoPath := filepath.Join(camera.Path, timestamp+".mp4")
-	_, err = os.Stat(videoPath)
+	videoPath, err := getVideoPath(camera, timestamp)
 	if err != nil {
-		http.Error(writer, "video does not exist", http.StatusNotFound)
-		return
+		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
 	http.ServeFile(writer, request, videoPath)
