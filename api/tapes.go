@@ -357,7 +357,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 
 	response, err := json.Marshal(recordings)
 	if err != nil {
-		http.Error(writer, "failed to marshal JSON", http.StatusInternalServerError)
+		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
 		return
 	}
 
@@ -376,18 +376,21 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	camera, err := getCamera(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
+		return
 	}
 
 	// check if the video file exists outside of getThumbnailPath to manage error status
 	_, err = getVideoPath(camera, timestamp)
 	if err != nil {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
+		return
 	}
 
 	// get the thumbnail, will be created if it does not already exist
 	thumbnailPath, err := getThumbnailPath(camera, timestamp)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	http.ServeFile(writer, request, thumbnailPath)
