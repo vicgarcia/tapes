@@ -24,26 +24,26 @@ export function Dashboard() {
     return <Container>
       <Row className='pt-4 g-5'>
 
-        <Col lg={8} className='d-none d-lg-block'>
-            <h3>tapes.4406fillmore.com</h3>
+        <Col lg={6} className='d-none d-lg-block'>
+            <h1><i className='bi bi-cassette header-icon'></i>tapes</h1>
         </Col>
 
         {active == null ? <>
-            <Col xs={6} lg={2} className='text-center'>
+            <Col xs={6} lg={3} className='text-center'>
                 <CameraSelect
                     selected={selectedCamera}
                     setSelected={setSelectedCamera}
                 />
             </Col>
 
-            <Col xs={6} lg={2} className='text-center'>
+            <Col xs={6} lg={3} className='text-center'>
                 <DateSelect
                     selected={selectedDate}
                     setSelected={setSelectedDate}
                 />
             </Col>
         </> : <>
-            <Col xs={12} lg={4} className='text-end'>
+            <Col xs={12} lg={6} className='text-end'>
                 <Button size='sm' className='uppercase p-2' style={{width: '200px'}}
                     variant='outline-secondary'
                     onClick={_ => setActive(null)}
