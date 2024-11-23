@@ -15,7 +15,7 @@ export function CameraSelect({selected, setSelected}: CameraSelectProps) {
         getCameras().then(response => {
             setCameras(response);
             // default to first camera in list
-            if (response.length > 0) {
+            if (selected === null && response.length > 0) {
                 setSelected(response[0]);
             }
         });
