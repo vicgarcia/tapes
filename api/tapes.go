@@ -195,7 +195,7 @@ func getRecordingsByDay(camera Camera, day string) ([]Recording, error) {
 		sort.Strings(files)
 
 		now := time.Now()
-		currentDay := now.Format("2006-01-02")
+		currentDay := now.Format("20060102")
 
 		// do not include the most recent video (it's being recorded)
 		if dayQuery == currentDay {
@@ -206,6 +206,7 @@ func getRecordingsByDay(camera Camera, day string) ([]Recording, error) {
 	recordings := make([]Recording, 0)
 
 	for _, file := range files {
+		// todo: skip any file with a hyphen, these are events not recordings
 		timestamp := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		recordings = append(recordings, Recording{File: file, Timestamp: timestamp})
 	}
@@ -320,13 +321,13 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 // returns json list of cameras
 
 func camerasHandler(writer http.ResponseWriter, request *http.Request) {
-	names, err := getCameras()
+	cameras, err := getCameras()
 	if err != nil {
 		http.Error(writer, "error querying cameras", http.StatusInternalServerError)
 		return
 	}
 
-	response, err := json.Marshal(names)
+	response, err := json.Marshal(cameras)
 	if err != nil {
 		http.Error(writer, "failed to marshal JSON", http.StatusInternalServerError)
 		return
