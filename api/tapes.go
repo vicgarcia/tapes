@@ -48,7 +48,10 @@ func getPasswd() (*htpasswd.File, error) {
 }
 
 func generateToken(username string) (string, error) {
-	const issuer = "tapes.4406fillmore.com"
+	issuer := os.Getenv("JWT_ISSUER")
+	if issuer == "" {
+		issuer = "tapes"
+	}
 
 	key := os.Getenv("JWT_KEY")
 	if key == "" {
