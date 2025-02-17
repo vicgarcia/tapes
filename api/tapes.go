@@ -27,7 +27,7 @@ type Camera struct {
 	Name string `json:"name"`
 }
 
-type Recording struct {
+type Video struct {
 	File      string `json:"-"`
 	Timestamp string `json:"timestamp"`
 }
@@ -187,7 +187,7 @@ func getCamera(cameraName string) (Camera, error) {
 	return camera, nil
 }
 
-func getRecordingsByDay(camera Camera, day string) ([]Recording, error) {
+func getVideosByDay(camera Camera, day string) ([]Recording, error) {
 	dayQuery := strings.Replace(day, "-", "", -1)
 
 	files, err := filepath.Glob(filepath.Join(camera.Path, dayQuery+"*.mp4"))
@@ -207,21 +207,21 @@ func getRecordingsByDay(camera Camera, day string) ([]Recording, error) {
 		}
 	}
 
-	recordings := make([]Recording, 0)
+	videos := make([]Video, 0)
 
 	for _, file := range files {
-		// todo: skip any file with a hyphen, these are events not recordings
 		timestamp := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
-		recordings = append(recordings, Recording{File: file, Timestamp: timestamp})
+		videos = append(videos, Video{File: file, Timestamp: timestamp})
 	}
 
-	return recordings, nil
+	return videos, nil
 }
 
-func getVideoPath(camera Camera, timestamp string) (string, error) {
+func getVideoPath(camera Camera, timestamp string) string {
 	videoPath := filepath.Join(camera.Path, timestamp+".mp4")
-	_, err := os.Stat(videoPath)
-	return videoPath, err
+	return videoPath
+}
+
 }
 
 func getThumbnailPath(camera Camera, timestamp string) (string, error) {
