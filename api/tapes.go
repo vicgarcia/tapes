@@ -32,6 +32,8 @@ type Video struct {
 	Timestamp string `json:"timestamp"`
 }
 
+const deleteAfterDays = 90
+
 // ----- functions -----
 
 // load passwords file for use validating passwords
@@ -279,6 +281,68 @@ func generateThumbnail(videoPath string) (string, error) {
 	return thumbnailPath, nil
 }
 
+func getAllVideoPaths(camera Camera) ([]string, error) {
+	files, err := filepath.Glob(filepath.Join(camera.Path, "*.mp4"))
+	if err != nil {
+		return make([]string, 0), err
+	}
+
+	// sort chronologically
+	sort.Strings(files)
+
+	// skip last file, likely to be actively being written to
+	files = files[:len(files)-1]
+
+	return files, nil
+}
+
+func currateVideos() {
+	// get all cameras
+	cameras, err := getCameras()
+	if err != nil {
+		return
+	}
+
+	// get current timestamp (for date)
+	currentTime := time.Now()
+
+	// iterate over cameras
+	for _, camera := range cameras {
+
+		// get all video paths
+		videoPaths, err := getAllVideoPaths(camera)
+		if err != nil {
+			continue
+		}
+
+		// iterate over video paths
+		for _, videoPath := range videoPaths {
+
+			// handle deleting of old files
+			filename := filepath.Base(videoPath)
+			parsedDate, err := time.Parse("20260102", filename[:8])
+			if err == nil {
+				diff := currentTime.Sub(parsedDate)
+				daysAgo := int(diff.Hours() / 24)
+				if daysAgo > deleteAfterDays {
+					// check and delete thumbnail
+					// delete file (video)
+					continue
+				}
+			}
+
+			// check for a thumbnail and create when missing
+			thumbnailPath := getThumbnailPath(videoPath)
+			if !fileExists(thumbnailPath) {
+				generateThumbnail(videoPath)
+			}
+
+		}
+	}
+
+	return
+}
+
 // ----- handlers -----
 
 // health check endpoint
@@ -386,18 +450,20 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// check if the video file exists outside of getThumbnailPath to manage error status
-	_, err = getVideoPath(camera, timestamp)
-	if err != nil {
+	// check if the video file exists outside of getThumbnail to manage error status
+	videoPath := getVideoPath(camera, timestamp)
+	if !fileExists(videoPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
-		return
 	}
 
 	// get the thumbnail, will be created if it does not already exist
-	thumbnailPath, err := getThumbnailPath(camera, timestamp)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+	thumbnailPath := getThumbnailPath(videoPath)
+	if !fileExists(thumbnailPath) {
+		thumbnailPath, err = generateThumbnail(videoPath)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	http.ServeFile(writer, request, thumbnailPath)
