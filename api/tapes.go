@@ -222,23 +222,25 @@ func getVideoPath(camera Camera, timestamp string) string {
 	return videoPath
 }
 
+func getThumbnailPath(videoPath string) string {
+	thumbnailPath := strings.Replace(videoPath, ".mp4", ".jpg", -1)
+	return thumbnailPath
 }
 
-func getThumbnailPath(camera Camera, timestamp string) (string, error) {
+func fileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return err == nil
+}
 
-	// check if thumbnail already exists
-	thumbnailPath := filepath.Join(camera.Path, timestamp+".jpg")
-	_, err := os.Stat(thumbnailPath)
-	if err == nil {
+func generateThumbnail(videoPath string) (string, error) {
+
+	// if the thumbnail exists return it's path
+	thumbnailPath := getThumbnailPath(videoPath)
+	if fileExists(thumbnailPath) {
 		return thumbnailPath, nil
 	}
 
-	// open video file
-	videoPath, err := getVideoPath(camera, timestamp)
-	if err != nil {
-		return "", errors.New("video file does not exist")
-	}
-
+	// open video
 	video, err := gocv.OpenVideoCapture(videoPath)
 	if err != nil {
 		return "", errors.New("error opening video file")
