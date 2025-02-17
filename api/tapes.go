@@ -63,7 +63,7 @@ func generateToken(username string) (string, error) {
 		return "", fmt.Errorf("missing JWT_KEY environment variable")
 	}
 
-	tokenLife, _ := time.ParseDuration("90m")
+	tokenLife, _ := time.ParseDuration("180m")
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
 		jwt.RegisteredClaims{
