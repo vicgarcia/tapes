@@ -284,20 +284,20 @@ func healthHandler(writer http.ResponseWriter, request *http.Request) {
 
 // login endpoint
 // returns token on successful authentication
-
 func loginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
 
 	passwd, err := getPasswd()
 	if err != nil {
-		http.Error(writer, "error validating password", http.StatusInternalServerError)
+		log.Error(err)
+		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
 
 	username := request.FormValue("username")
 	password := request.FormValue("password")
 	if username == "" || password == "" {
-		http.Error(writer, "invalid credentials", http.StatusUnauthorized)
+		http.Error(writer, "login failed", http.StatusUnauthorized)
 		return
 	}
 
@@ -309,7 +309,8 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 	token, err := generateToken(username)
 	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		log.Error(err)
+		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
 
