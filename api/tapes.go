@@ -106,7 +106,7 @@ func validateAuthHeader(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		if !token.Valid {
-			http.Error(w, "invalid authentication", http.StatusUnauthorized)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
@@ -150,7 +150,6 @@ func getRecordingsPath() (string, error) {
 
 func getCameras() ([]Camera, error) {
 	recordingsPath, err := getRecordingsPath()
-	log.Printf("recording path %s", recordingsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -482,8 +481,8 @@ func videoHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	videoPath, err := getVideoPath(camera, timestamp)
-	if err != nil {
+	videoPath := getVideoPath(camera, slug)
+	if !fileExists(videoPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
@@ -500,9 +499,10 @@ var static embed.FS
 func main() {
 
 	// load .env file from the same path as the executable
+	log.Println("loading environment config")
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Fatalf("error loading .env file : %v", err)
 		return
 	}
 
@@ -520,6 +520,7 @@ func main() {
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// start server
+	log.Println("starting http server")
 	srv := &http.Server{
 		Addr:    ":8633",
 		Handler: r,
