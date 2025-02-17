@@ -34,6 +34,7 @@ type Recording struct {
 
 // ----- functions -----
 
+// load passwords file for use validating passwords
 func getPasswd() (*htpasswd.File, error) {
 	passwdPath := os.Getenv("PASSWORDS_PATH")
 	if passwdPath == "" {
@@ -44,9 +45,11 @@ func getPasswd() (*htpasswd.File, error) {
 	if err != nil {
 		return &htpasswd.File{}, err
 	}
+
 	return passwd, nil
 }
 
+// generate jwt token
 func generateToken(username string) (string, error) {
 	issuer := os.Getenv("JWT_ISSUER")
 	if issuer == "" {
@@ -71,6 +74,7 @@ func generateToken(username string) (string, error) {
 	return token.SignedString([]byte(key))
 }
 
+// parse jwt token
 func parseJwtToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		key := os.Getenv("JWT_KEY")
@@ -82,9 +86,8 @@ func parseJwtToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
+// middleware to validate jwt token in auth header
 func validateAuthHeader(next http.HandlerFunc) http.HandlerFunc {
-	// validate jwt token in auth header
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		headerToken := r.Header.Get("Authorization")
 		headerToken = strings.Replace(headerToken, "Bearer ", "", -1)
@@ -95,6 +98,7 @@ func validateAuthHeader(next http.HandlerFunc) http.HandlerFunc {
 				http.Error(w, "expired token", http.StatusUnauthorized)
 				return
 			}
+
 			http.Error(w, "error parsing token", http.StatusUnauthorized)
 			return
 		}
@@ -108,9 +112,8 @@ func validateAuthHeader(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// middleware to validate jwt token in url param
 func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
-	// validate jwt token in auth header
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		paramToken := r.URL.Query().Get("token")
 		token, err := parseJwtToken(paramToken)
@@ -133,6 +136,7 @@ func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// get path to saved recording files from env var
 func getRecordingsPath() (string, error) {
 	recordingsPath := os.Getenv("RECORDINGS_PATH")
 	if recordingsPath == "" {
@@ -277,7 +281,6 @@ func getThumbnailPath(camera Camera, timestamp string) (string, error) {
 
 // health check endpoint
 // returns 200 with no content
-
 func healthHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Fprintf(writer, "OK")
 }
@@ -320,7 +323,6 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 // cameras endpoint
 // returns json list of cameras
-
 func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 	cameras, err := getCameras()
 	if err != nil {
@@ -340,7 +342,6 @@ func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 
 // camera endpoint
 // query recordings by date
-
 func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
@@ -372,7 +373,6 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 
 // thumbnail endpoint
 // serve video thumbnail images, create when they do not exist
-
 func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
@@ -403,7 +403,6 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 
 // video endpoint
 // serve video file
-
 func videoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
@@ -457,6 +456,5 @@ func main() {
 		Addr:    ":8633",
 		Handler: r,
 	}
-
 	log.Fatal(srv.ListenAndServe())
 }
