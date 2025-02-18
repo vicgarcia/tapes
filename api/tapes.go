@@ -357,7 +357,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 	passwd, err := getPasswd()
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
@@ -377,7 +377,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 	token, err := generateToken(username)
 	if err != nil {
-		log.Error(err)
+		log.Fatal(err)
 		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
