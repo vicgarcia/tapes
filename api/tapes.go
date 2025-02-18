@@ -139,29 +139,29 @@ func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // get path to saved recording files from env var
-func getRecordingsPath() (string, error) {
-	recordingsPath := os.Getenv("RECORDINGS_PATH")
-	if recordingsPath == "" {
+func getVideosPath() (string, error) {
+	videosPath := os.Getenv("RECORDINGS_PATH")
+	if videosPath == "" {
 		return "", fmt.Errorf("missing RECORDINGS_PATH environment variable")
 	}
 
-	return recordingsPath, nil
+	return videosPath, nil
 }
 
 func getCameras() ([]Camera, error) {
-	recordingsPath, err := getRecordingsPath()
+	videosPath, err := getVideosPath()
 	if err != nil {
 		return nil, err
 	}
 
-	dirs, err := os.ReadDir(recordingsPath)
+	dirs, err := os.ReadDir(videosPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %w", err)
 	}
 
 	cameras := make([]Camera, 0)
 	for _, d := range dirs {
-		path := filepath.Join(recordingsPath, d.Name())
+		path := filepath.Join(videosPath, d.Name())
 		cameras = append(cameras, Camera{Path: path, Name: d.Name()})
 	}
 
@@ -169,12 +169,12 @@ func getCameras() ([]Camera, error) {
 }
 
 func getCamera(cameraName string) (Camera, error) {
-	recordingsPath, err := getRecordingsPath()
+	videosPath, err := getVideosPath()
 	if err != nil {
 		return Camera{}, err
 	}
 
-	cameraPath := filepath.Join(recordingsPath, cameraName)
+	cameraPath := filepath.Join(videosPath, cameraName)
 	_, cameraPathExistsErr := os.Stat(cameraPath)
 	if cameraPathExistsErr != nil {
 		return Camera{}, cameraPathExistsErr
@@ -188,7 +188,7 @@ func getCamera(cameraName string) (Camera, error) {
 	return camera, nil
 }
 
-func getVideosByDay(camera Camera, day string) ([]Recording, error) {
+func getVideosByDay(camera Camera, day string) ([]Video, error) {
 	dayQuery := strings.Replace(day, "-", "", -1)
 
 	files, err := filepath.Glob(filepath.Join(camera.Path, dayQuery+"*.mp4"))
@@ -420,7 +420,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 	day := request.URL.Query().Get("day")
 	// todo: validate day
 
-	recordings, err := getRecordingsByDay(camera, day)
+	recordings, err := getVideosByDay(camera, day)
 	if err != nil {
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
@@ -481,7 +481,7 @@ func videoHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	videoPath := getVideoPath(camera, slug)
+	videoPath := getVideoPath(camera, timestamp)
 	if !fileExists(videoPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
