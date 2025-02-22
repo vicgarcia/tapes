@@ -140,9 +140,9 @@ func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
 
 // get path to saved recording files from env var
 func getVideosPath() (string, error) {
-	videosPath := os.Getenv("RECORDINGS_PATH")
+	videosPath := os.Getenv("VIDEO_PATH")
 	if videosPath == "" {
-		return "", fmt.Errorf("missing RECORDINGS_PATH environment variable")
+		return "", fmt.Errorf("missing VIDEO_PATH environment variable")
 	}
 
 	return videosPath, nil
@@ -150,6 +150,7 @@ func getVideosPath() (string, error) {
 
 func getCameras() ([]Camera, error) {
 	videosPath, err := getVideosPath()
+	fmt.Printf("got video path %s", videosPath)
 	if err != nil {
 		return nil, err
 	}
@@ -518,6 +519,8 @@ func main() {
 	r.HandleFunc("/cameras/{camera}/{timestamp}/video", validateAuthParam(videoHandler))
 	r.HandleFunc("/cameras/{camera}/{timestamp}/thumbnail", validateAuthHeader(thumbnailHandler)).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
+
+	// start background process to currate library
 
 	// start server
 	log.Println("starting http server")

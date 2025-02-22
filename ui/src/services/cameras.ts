@@ -5,7 +5,7 @@ export function getCameras() {
         .then(response => response.data);
 };
 
-export function getRecordingsByDate(cameraName: string, day: string) {
+export function getVideosByDate(cameraName: string, day: string) {
     const url = `/cameras/${cameraName}`;
     return httpClient.get(url, {params: { day }})
         .then(response => response.data);

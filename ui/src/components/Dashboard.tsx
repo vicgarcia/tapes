@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Container, Row, Col, Button } from "react-bootstrap";
 import dayjs from 'dayjs';
-import { Camera } from '@app/types';
-import { getRecordingsByDate } from '@app/services/cameras';
+import { Camera, Video } from '@app/types';
+import { getVideosByDate } from '@app/services/cameras';
 import { CameraSelect } from './CameraSelect';
 import { DateSelect } from './DateSelect';
 import { Thumbnail } from './Thumbnail';
@@ -11,12 +11,12 @@ import { VideoPlayer } from './VideoPlayer';
 export function Dashboard() {
     const [selectedDate, setSelectedDate] = useState<Date|null>(null);
     const [selectedCamera, setSelectedCamera] = useState<Camera|null>(null);
-    const [videos, setVideos] = useState<Array<any>>([]);
-    const [active, setActive] = useState<string|null>(null);
+    const [videos, setVideos] = useState<Array<Video>>([]);
+    const [active, setActive] = useState<Video|null>(null);
 
     useEffect(() => {
         if (selectedCamera !== null && selectedDate !== null) {
-            getRecordingsByDate(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
+            getVideosByDate(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
                 .then(response => setVideos(response));
         }
     }, [selectedCamera, selectedDate])
@@ -59,7 +59,7 @@ export function Dashboard() {
             {active !== null ? <>
                 <VideoPlayer
                     camera={selectedCamera!}
-                    timestamp={active}
+                    video={active}
                 />
             </> : <>
                 <Row>
@@ -67,7 +67,7 @@ export function Dashboard() {
                         <Thumbnail
                             key={`${selectedCamera!.name}-${v.timestamp}`}
                             camera={selectedCamera!}
-                            timestamp={v.timestamp}
+                            video={v}
                             setActive={setActive}
                         />
                     )}
