@@ -10,9 +10,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -318,6 +320,9 @@ func currateVideos() {
 		// iterate over video paths
 		for _, videoPath := range videoPaths {
 
+			// get the thumbnail path
+			thumbnailPath := getThumbnailPath(videoPath)
+
 			// handle deleting of old files
 			filename := filepath.Base(videoPath)
 			parsedDate, err := time.Parse("20260102", filename[:8])
@@ -325,14 +330,18 @@ func currateVideos() {
 				diff := currentTime.Sub(parsedDate)
 				daysAgo := int(diff.Hours() / 24)
 				if daysAgo > deleteAfterDays {
-					// check and delete thumbnail
-					// delete file (video)
+					if fileExists(thumbnailPath) {
+						err = os.Remove(thumbnailPath)
+						if err != nil {
+							log.Printf("Error deleting thumbnail %s", thumbnailPath)
+						}
+					}
+					err = os.Remove((videoPath))
 					continue
 				}
 			}
 
-			// check for a thumbnail and create when missing
-			thumbnailPath := getThumbnailPath(videoPath)
+			// create thumbnail when none exists
 			if !fileExists(thumbnailPath) {
 				generateThumbnail(videoPath)
 			}
@@ -507,6 +516,10 @@ func main() {
 		return
 	}
 
+	// create signal channel for graceful shutdown from os signal
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
 	// static filesystem
 	staticFS, _ := fs.Sub(static, "dist")
 
@@ -520,13 +533,52 @@ func main() {
 	r.HandleFunc("/cameras/{camera}/{timestamp}/thumbnail", validateAuthHeader(thumbnailHandler)).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
-	// start background process to currate library
-
-	// start server
-	log.Println("starting http server")
+	// create server
 	srv := &http.Server{
 		Addr:    ":8633",
 		Handler: r,
 	}
+
+    // start http server in a goroutine
+    go func {
+        log.Println("starting http server")
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("http server error %v", err)
+        }
+    }()
+
+	// start background curration process in a goroutine
+	done := make(chan bool)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		currateVideos()
+		for {
+			select {
+			case <-ticker.C:
+				currateVideos()
+			case <-done:
+				return
+			}
+		}
+	}()
+
+    // wait for interrupt signal
+    <-stop
+    log.Println("shutting down")
+
+    // stop http server
+    if err := srv.Close(); err != nil {
+        log.Printf("http server error %v", err)
+    }
+
+    // stop curation process
+    close(done)
+
+	// start background process to currate library
+
+	// start server
+
+
 	log.Fatal(srv.ListenAndServe())
 }
