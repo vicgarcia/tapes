@@ -11,12 +11,14 @@ import (
 
 // health check endpoint
 // returns 200 with no content
+
 func healthHandler(writer http.ResponseWriter, request *http.Request) {
 	fmt.Fprintf(writer, "OK")
 }
 
 // login endpoint
 // returns token on successful authentication
+
 func loginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
 
@@ -53,6 +55,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 // cameras endpoint
 // returns json list of cameras
+
 func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 	cameras, err := getCameras()
 	if err != nil {
@@ -72,6 +75,7 @@ func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 
 // camera endpoint
 // query recordings by date
+
 func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
@@ -103,6 +107,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 
 // thumbnail endpoint
 // serve video thumbnail images, create when they do not exist
+
 func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
@@ -135,6 +140,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 
 // video endpoint
 // serve video file
+
 func videoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
