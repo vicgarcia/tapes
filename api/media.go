@@ -208,7 +208,7 @@ func getAllVideoPaths(camera Camera) ([]string, error) {
 
 // process videos
 
-const deleteAfterDays = 90
+const deleteAfterDays = 60
 
 func processVideos() {
 	// get all cameras
