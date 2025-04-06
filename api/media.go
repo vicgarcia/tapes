@@ -199,7 +199,9 @@ func getAllVideoPaths(camera Camera) ([]string, error) {
 	sort.Strings(files)
 
 	// skip last file, likely to be actively being written to
-	files = files[:len(files)-1]
+	if len(files) > 0 {
+		files = files[:len(files)-1]
+	}
 
 	return files, nil
 }
@@ -246,7 +248,7 @@ func processVideo(videoPath string, currentTime time.Time) {
 	// handle deleting of old files
 	filename := filepath.Base(videoPath)
 	parsedDate, err := time.Parse("20060102", filename[:8])
-	if err == nil {
+	if err != nil {
 		log.Printf("error parsing date from filename %s : %v", filename, err)
 		return
 	}
