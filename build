@@ -6,7 +6,7 @@ npm run build
 popd
 
 pushd api
-go build tapes.go
+go build
 popd
 
 mv api/tapes .
