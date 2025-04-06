@@ -137,6 +137,14 @@ func fileExists(filePath string) bool {
 	return err == nil
 }
 
+func fileEmpty(filePath string) bool {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return true
+	}
+	return fileInfo.Size() == 0
+}
+
 // generate thumbnail for a video from a video path
 
 func generateThumbnail(videoPath string) (string, error) {
@@ -242,15 +250,20 @@ func processCameraVideos(camera Camera, currentTime time.Time) {
 }
 
 func processVideo(videoPath string, currentTime time.Time) {
-	// get the thumbnail path
-	thumbnailPath := getThumbnailPath(videoPath)
-
-	// handle deleting of old files
+	// parse filename to a timestamp
 	filename := filepath.Base(videoPath)
 	parsedDate, err := time.Parse("20060102", filename[:8])
 	if err != nil {
 		log.Printf("error parsing date from filename %s : %v", filename, err)
 		return
+	}
+
+	// get the thumbnail path
+	thumbnailPath := getThumbnailPath(videoPath)
+
+	// delete video if zero length
+	if fileEmpty(videoPath) {
+		deleteVideoAndThumbnail(videoPath, thumbnailPath)
 	}
 
 	// determine age of file
