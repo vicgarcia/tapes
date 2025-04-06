@@ -22,6 +22,8 @@ var static embed.FS
 // web server
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
 
 	// load .env file from the same path as the executable
 	log.Println("loading environment config")
