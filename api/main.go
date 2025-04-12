@@ -44,7 +44,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/health", healthHandler).Methods("GET")
 	r.HandleFunc("/login", loginHandler).Methods("POST")
-	r.HandleFunc("/auth", validateAuth(authHandler)).Methods()
+	r.HandleFunc("/auth", validateAuth(authHandler)).Methods("GET")
 	r.HandleFunc("/cameras", validateAuth(camerasHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}", validateAuth(cameraHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/{timestamp}/video", validateAuth(videoHandler))
