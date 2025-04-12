@@ -12,10 +12,10 @@ export function Login() {
     const auth = useAuth() as AuthProviderType;
 
     useEffect(() => {
-        if (auth.token !== null) {
+        if (auth.isAuthenticated === true) {
             navigate('/dashboard');
         }
-    }, [auth.token]);
+    }, [auth.isAuthenticated]);
 
     const updateLogin = (value: string) => {
         setError(null);
