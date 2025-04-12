@@ -1,11 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -51,7 +49,12 @@ func generateJwtToken(username string) (string, error) {
 		},
 	)
 
-	return token.SignedString([]byte(key))
+	signedToken, err := token.SignedString([]byte(key))
+	if err != nil {
+		return "", fmt.Errorf("error while signing JWT token string")
+	}
+
+	return signedToken, nil
 }
 
 // parse jwt token
@@ -67,51 +70,60 @@ func parseJwtToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
-// middleware to validate jwt token in auth header
+// handle cookies
 
-func validateAuthHeader(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		headerToken := r.Header.Get("Authorization")
-		headerToken = strings.Replace(headerToken, "Bearer ", "", -1)
-		token, err := parseJwtToken(headerToken)
+const cookieName = "tapes"
 
-		if err != nil {
-			if errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet) {
-				http.Error(w, "expired token", http.StatusUnauthorized)
-				return
-			}
+// set cookie
 
-			http.Error(w, "error parsing token", http.StatusUnauthorized)
-			return
-		}
-
-		if !token.Valid {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		next(w, r)
+func setCookie(writer http.ResponseWriter, username string) error {
+	jwtToken, err := generateJwtToken(username)
+	if err != nil {
+		return err
 	}
+
+	http.SetCookie(writer, &http.Cookie{
+		Name:     cookieName,
+		Value:    jwtToken,
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   false, // Requires HTTPS
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   180 * 60, // 180 minutes to match token expiration
+	})
+
+	return nil
 }
 
-// middleware to validate jwt token in url param
+// delete cookie
 
-func validateAuthParam(next http.HandlerFunc) http.HandlerFunc {
+func deleteCookie(writer http.ResponseWriter) error {
+	http.SetCookie(writer, &http.Cookie{
+		Name:     cookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   false, // Requires HTTPS
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1, // Expire immediately
+	})
+
+	return nil
+}
+
+// middleware to validate jwt token in cookie
+
+func validateAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		paramToken := r.URL.Query().Get("token")
-		token, err := parseJwtToken(paramToken)
-
+		cookie, err := r.Cookie(cookieName)
 		if err != nil {
-			if errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet) {
-				http.Error(w, "expired token", http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, "error parsing token", http.StatusUnauthorized)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		if !token.Valid {
-			http.Error(w, "invalid authentication", http.StatusUnauthorized)
+		token, err := parseJwtToken(cookie.Value)
+		if err != nil || !token.Valid {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -13,11 +12,22 @@ import (
 // returns 200 with no content
 
 func healthHandler(writer http.ResponseWriter, request *http.Request) {
-	fmt.Fprintf(writer, "OK")
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte(`{"status": "success"}`))
+}
+
+// authentication check endpoint
+// returns status to indicate validity of authentication cookie
+
+func authHandler(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte(`{"status": "success"}`))
 }
 
 // login endpoint
-// returns token on successful authentication
+// sets auth cookie on successful authentication
 
 func loginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
@@ -42,15 +52,31 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	token, err := generateJwtToken(username)
+	err = setCookie(writer, username)
 	if err != nil {
 		log.Fatal(err)
-		http.Error(writer, "login failed", http.StatusInternalServerError)
+		http.Error(writer, "login failed", http.StatusUnauthorized)
 		return
 	}
 
-	// return token json
-	writer.Write([]byte(token))
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte(`{"status": "success"}`))
+}
+
+// logout endpoint
+// clear auth cookie
+
+func logoutHandler(writer http.ResponseWriter, request *http.Request) {
+	err := deleteCookie(writer)
+	if err != nil {
+		log.Fatal(err)
+		http.Error(writer, "logout failed", http.StatusUnauthorized)
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.WriteHeader(http.StatusOK)
+	writer.Write([]byte(`{"status": "success"}`))
 }
 
 // cameras endpoint
@@ -79,7 +105,6 @@ func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-
 	camera, err := getCamera(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)

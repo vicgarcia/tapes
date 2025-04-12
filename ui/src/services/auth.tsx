@@ -1,10 +1,10 @@
 import axios from "axios";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Navigate, useLocation } from 'react-router-dom';
 import httpClient from "@app/services/base";
 
 export type AuthProviderType = {
-  token: string
+  isAuthenticated: boolean
   login: Function
   logout: Function
 }
@@ -13,7 +13,12 @@ export type AuthProviderType = {
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }: any) => {
-  const [token, setToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    axios.get('/auth')
+      .then(_ => setIsAuthenticated(true));
+  }, []);
 
   const login = async (username: string, password: string) => {
     const payload = new URLSearchParams();
@@ -22,18 +27,21 @@ export const AuthProvider = ({ children }: any) => {
 
     return axios.post('/login', payload)
       .then(response => {
-        setToken(response.data);
+        setIsAuthenticated(response.data);
         httpClient.defaults.headers.common["Authorization"] = "Bearer " + response.data;
         return response.data;
       });
   };
 
   const logout = () => {
-    setToken(null);
+    return axios.post('/logout')
+      .then(response => {
+        setIsAuthenticated(false);
+      })
   }
 
   // Provide the authentication context to the children components
-  return <AuthContext.Provider value={{ token, login, logout }}>
+  return <AuthContext.Provider value={{ login, logout }}>
     {children}
   </AuthContext.Provider>
 };
@@ -49,7 +57,7 @@ export type RequireAuthProps = {
 export function RequireAuth({ children }: RequireAuthProps) {
   let auth = useAuth();
   let location = useLocation();
-  if (auth.token === null) return <Navigate to="/login" state={{ from: location }} />;
+  if (auth.isAuthenticated === true) return <Navigate to="/login" state={{ from: location }} />;
   return children;
 }
 

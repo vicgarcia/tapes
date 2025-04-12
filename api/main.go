@@ -44,10 +44,11 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/health", healthHandler).Methods("GET")
 	r.HandleFunc("/login", loginHandler).Methods("POST")
-	r.HandleFunc("/cameras", validateAuthHeader(camerasHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}", validateAuthHeader(cameraHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/{timestamp}/video", validateAuthParam(videoHandler))
-	r.HandleFunc("/cameras/{camera}/{timestamp}/thumbnail", validateAuthHeader(thumbnailHandler)).Methods("GET")
+	r.HandleFunc("/auth", validateAuth(authHandler)).Methods()
+	r.HandleFunc("/cameras", validateAuth(camerasHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}", validateAuth(cameraHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/{timestamp}/video", validateAuth(videoHandler))
+	r.HandleFunc("/cameras/{camera}/{timestamp}/thumbnail", validateAuth(thumbnailHandler)).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// create server
