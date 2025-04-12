@@ -53,5 +53,7 @@
 
 .header-icon {
     margin-right: 10px;
-    color: var(--bs-btn-active-color)
+    color: var(--bs-btn-active-color);
+    position: relative;
+    top: 4px;
 }
