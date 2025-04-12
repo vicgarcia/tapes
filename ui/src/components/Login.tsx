@@ -15,7 +15,7 @@ export function Login() {
         if (auth.isAuthenticated === true) {
             navigate('/dashboard');
         }
-    }, []);
+    }, [auth.isAuthenticated]);
 
     const updateLogin = (value: string) => {
         setError(null);
@@ -40,10 +40,6 @@ export function Login() {
         }
         if (!hasError) {
             auth.login(login, password)
-                // @ts-ignore
-                .then(_ => {
-                    navigate('/dashboard');
-                })
                 // @ts-ignore
                 .catch(err => {
                     setError(err.response.data.error);

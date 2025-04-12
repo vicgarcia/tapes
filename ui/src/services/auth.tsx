@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }: any) => {
       });
   };
 
-  const logout = () => {
+  const logout = async () => {
     return axios.post('/logout')
       .then(response => {
         setIsAuthenticated(false);
