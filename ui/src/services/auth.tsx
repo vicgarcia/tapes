@@ -27,9 +27,7 @@ export const AuthProvider = ({ children }: any) => {
 
     return axios.post('/login', payload)
       .then(response => {
-        setIsAuthenticated(response.data);
-        httpClient.defaults.headers.common["Authorization"] = "Bearer " + response.data;
-        return response.data;
+        setIsAuthenticated(true);
       });
   };
 
