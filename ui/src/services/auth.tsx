@@ -55,7 +55,7 @@ export type RequireAuthProps = {
 export function RequireAuth({ children }: RequireAuthProps) {
   let auth = useAuth();
   let location = useLocation();
-  if (auth.isAuthenticated === true) return <Navigate to="/login" state={{ from: location }} />;
+  if (auth.isAuthenticated !== true) return <Navigate to="/login" state={{ from: location }} />;
   return children;
 }
 
