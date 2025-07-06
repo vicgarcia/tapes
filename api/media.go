@@ -21,41 +21,54 @@ type Camera struct {
 	Name string `json:"name"`
 }
 
-// video object
+// video base object
 
 type Video struct {
 	File      string `json:"-"`
 	Timestamp string `json:"timestamp"`
 }
 
+// recording object extending video
+
+type Recording struct {
+	Video
+}
+
+// event object extending video with additional type field
+
+type Event struct {
+	Video
+	Type string `json:"event_type"`
+}
+
 // get path to saved recording files from env var
 
-func getVideosPath() (string, error) {
-	videosPath := os.Getenv("VIDEO_PATH")
-	if videosPath == "" {
-		return "", fmt.Errorf("missing VIDEO_PATH environment variable")
+func getStoragePath() (string, error) {
+	storagePath := os.Getenv("STORAGE_PATH")
+	if storagePath == "" {
+		return "", fmt.Errorf("missing STORAGE_PATH environment variable")
 	}
 
-	return videosPath, nil
+	return storagePath, nil
 }
 
 // get a list of camera objects from video path folders
 
 func getCameras() ([]Camera, error) {
-	videosPath, err := getVideosPath()
-	fmt.Printf("got video path %s", videosPath)
+	storagePath, err := getStoragePath()
+	fmt.Printf("got storage path %s", storagePath)
 	if err != nil {
 		return nil, err
 	}
 
-	dirs, err := os.ReadDir(videosPath)
+	dirs, err := os.ReadDir(storagePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %w", err)
 	}
 
 	cameras := make([]Camera, 0)
 	for _, d := range dirs {
-		path := filepath.Join(videosPath, d.Name())
+		path := filepath.Join(storagePath, d.Name())
 		cameras = append(cameras, Camera{Path: path, Name: d.Name()})
 	}
 
@@ -65,12 +78,12 @@ func getCameras() ([]Camera, error) {
 // get a camera object by its name as a string
 
 func getCamera(cameraName string) (Camera, error) {
-	videosPath, err := getVideosPath()
+	storagePath, err := getStoragePath()
 	if err != nil {
 		return Camera{}, err
 	}
 
-	cameraPath := filepath.Join(videosPath, cameraName)
+	cameraPath := filepath.Join(storagePath, cameraName)
 	_, cameraPathExistsErr := os.Stat(cameraPath)
 	if cameraPathExistsErr != nil {
 		return Camera{}, cameraPathExistsErr
@@ -116,12 +129,14 @@ func getVideosByDay(camera Camera, day string) ([]Video, error) {
 	return videos, nil
 }
 
-// get path to a video file by camera and timestamp
+// get path to a recording file by camera and timestamp
 
-func getVideoPath(camera Camera, timestamp string) string {
-	videoPath := filepath.Join(camera.Path, timestamp+".mp4")
-	return videoPath
+func getRecordingPath(camera Camera, timestamp string) string {
+	recordingPath := filepath.Join(camera.Path, timestamp+".mp4")
+	return recordingPath
 }
+
+// get path to an event file by camera, timestamp, type
 
 // get path to a video thumbnail image by corresponding video path
 
@@ -294,5 +309,76 @@ func deleteVideoAndThumbnail(videoPath, thumbnailPath string) {
 	err := os.Remove(videoPath)
 	if err != nil {
 		log.Printf("error deleting video %s : %v", videoPath, err)
+	}
+}
+
+// new functions for events
+
+func getAllEvents(camera Camera) ([]Event, error) {
+	events := make([]Event, 0)
+	videoPaths, err := getAllVideoPaths(camera)
+	if err != nil {
+		return events, err
+	}
+
+	for _, file := range videoPaths {
+		filename := filepath.Base(file)
+		parts := strings.SplitN(filename, "-", 2)
+		if len(parts) < 2 {
+			continue // Skip files not matching the expected format.
+		}
+		timestamp := parts[0]
+		eventType := parts[1]
+		events = append(events, Event{Video: Video{File: file, Timestamp: timestamp}, Type: eventType})
+	}
+
+	return events, nil
+}
+
+func processEvents() {
+	// get all cameras
+	cameras, err := getCameras()
+	if err != nil {
+		log.Printf("error getting cameras : %v", err)
+		return
+	}
+
+	currentTime := time.Now()
+
+	for _, camera := range cameras {
+		events, _ := getAllEvents(camera)
+		for _, event := range events {
+			processEvent(event.File, event.Type, currentTime)
+		}
+	}
+}
+
+func processEvent(videoPath string, eventType string, currentTime time.Time) {
+	// parse filename to a timestamp
+	filename := filepath.Base(videoPath)
+	parsedDate, err := time.Parse("20060102", filename[:8])
+	if err != nil {
+		log.Printf("error parsing date from filename %s : %v", filename, err)
+		return
+	}
+
+	// get the thumbnail path
+	thumbnailPath := getThumbnailPath(videoPath)
+
+	// delete video if zero length
+	if fileEmpty(videoPath) {
+		deleteVideoAndThumbnail(videoPath, thumbnailPath)
+	}
+
+	diff := currentTime.Sub(parsedDate)
+	daysAgo := int(diff.Hours() / 24)
+
+	if daysAgo > deleteAfterDays {
+		deleteVideoAndThumbnail(videoPath, thumbnailPath)
+	}
+
+	// create thumbnail when none exists
+	if !fileExists(thumbnailPath) {
+		generateThumbnail(videoPath)
 	}
 }

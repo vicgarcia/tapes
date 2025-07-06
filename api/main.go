@@ -48,8 +48,8 @@ func main() {
 	r.HandleFunc("/auth", validateAuth(authHandler)).Methods("GET")
 	r.HandleFunc("/cameras", validateAuth(camerasHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}", validateAuth(cameraHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/{timestamp}/video", validateAuth(videoHandler))
-	r.HandleFunc("/cameras/{camera}/{timestamp}/thumbnail", validateAuth(thumbnailHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", validateAuth(recordingVideoHandler))
+	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", validateAuth(recordingThumbnailHandler)).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// create server

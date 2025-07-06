@@ -1,0 +1,4 @@
+VIDEO_PATH=/Users/vicg4rcia/Code/tapes-go/.local/recordings
+PASSWORDS_PATH=/Users/vicg4rcia/Code/tapes-go/.local/passwords
+JWT_ISSUER=tapes.4406fillmore.com
+JWT_KEY=chaeCohNgaibahL8ael2ohkiQuolu9ungaiM6ohgah1jo7waiwi0oozoh3ileifu

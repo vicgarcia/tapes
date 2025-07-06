@@ -145,15 +145,15 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// check if the video file exists outside of getThumbnail to manage error status
-	videoPath := getVideoPath(camera, timestamp)
-	if !fileExists(videoPath) {
+	recordingPath := getRecordingPath(camera, timestamp)
+	if !fileExists(recordingPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
 	// get the thumbnail, will be created if it does not already exist
-	thumbnailPath := getThumbnailPath(videoPath)
+	thumbnailPath := getThumbnailPath(recordingPath)
 	if !fileExists(thumbnailPath) {
-		thumbnailPath, err = generateThumbnail(videoPath)
+		thumbnailPath, err = generateThumbnail(recordingPath)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
@@ -177,10 +177,10 @@ func videoHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	videoPath := getVideoPath(camera, timestamp)
-	if !fileExists(videoPath) {
+	recordingPath := getRecordingPath(camera, timestamp)
+	if !fileExists(recordingPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
-	http.ServeFile(writer, request, videoPath)
+	http.ServeFile(writer, request, recordingPath)
 }
