@@ -39,14 +39,16 @@ type Video struct {
 // recording object extending video
 
 type Recording struct {
-	Video
+	File      string `json:"-"`
+	Timestamp string `json:"timestamp"`
 }
 
 // event object extending video with additional type field
 
 type Event struct {
-	Video
-	Type string `json:"event_type"`
+	File      string `json:"-"`
+	Timestamp string `json:"timestamp"`
+	Type      string `json:"event_type"`
 }
 
 // get path to saved recording files from env var
