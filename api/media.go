@@ -66,7 +66,7 @@ func getStoragePath() (string, error) {
 
 func getCameras() ([]Camera, error) {
 	storagePath, err := getStoragePath()
-	fmt.Printf("got storage path %s", storagePath)
+	// fmt.Printf("got storage path %s", storagePath)
 	if err != nil {
 		return nil, err
 	}
