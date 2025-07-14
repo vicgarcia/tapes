@@ -21,6 +21,14 @@ type Camera struct {
 	Name string `json:"name"`
 }
 
+func (c Camera) RecordingsPath() string {
+	return filepath.Join(c.Path, "recordings")
+}
+
+func (c Camera) EventsPath() string {
+	return filepath.Join(c.Path, "events")
+}
+
 // video base object
 
 type Video struct {
