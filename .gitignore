@@ -13,8 +13,9 @@ logs
 # compiled binary
 tapes
 
-# local path (used in development)
+# local paths (used in development)
 .local
+data
 
 # junk
 .DS_Store

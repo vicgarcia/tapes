@@ -20,6 +20,22 @@ WORKDIR /gocv
 RUN git clone https://github.com/hybridgroup/gocv.git .
 RUN make install
 
+# build application
+WORKDIR /tapes
+
+WORKDIR /tapes/ui
+COPY ui .
+RUN npm install
+RUN npm run build
+
+WORKDIR /tapes/api
+COPY api .
+RUN go get
+RUN go build
+
+
+WORKDIR /tapes
+RUN ls -a -R
 
 # WORKDIR /opencv
 

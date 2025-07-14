@@ -47,9 +47,13 @@ func main() {
 	r.HandleFunc("/logout", logoutHandler).Methods("POST")
 	r.HandleFunc("/auth", validateAuth(authHandler)).Methods("GET")
 	r.HandleFunc("/cameras", validateAuth(camerasHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}", validateAuth(cameraHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", validateAuth(recordingVideoHandler))
+	r.HandleFunc("/cameras/{camera}/recordings", validateAuth(recordingsHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", validateAuth(recordingVideoHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", validateAuth(recordingThumbnailHandler)).Methods("GET")
+	// r.HandleFunc("/cameras/{camera}/events", validateAuth(eventsHandler)).Methods("GET")
+	// r.HandleFunc("/cameras/{camera}/events/{slug}/video", validateAuth(eventVideoHandler)).Methods("GET")
+	// r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", validateAuth(eventThumbnailHandler)).Methods("GET")
+
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// create server

@@ -102,7 +102,7 @@ func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 // camera endpoint
 // query recordings by date
 
-func cameraHandler(writer http.ResponseWriter, request *http.Request) {
+func recordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	camera, err := getCamera(cameraName)
@@ -114,7 +114,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 	day := request.URL.Query().Get("day")
 	// todo: validate day
 
-	recordings, err := getVideosByDay(camera, day)
+	recordings, err := getRecordingsByDay(camera, day)
 	if err != nil {
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
@@ -133,7 +133,7 @@ func cameraHandler(writer http.ResponseWriter, request *http.Request) {
 // thumbnail endpoint
 // serve video thumbnail images, create when they do not exist
 
-func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
+func recordingThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
@@ -166,7 +166,7 @@ func thumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 // video endpoint
 // serve video file
 
-func videoHandler(writer http.ResponseWriter, request *http.Request) {
+func recordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
