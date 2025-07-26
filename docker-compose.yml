@@ -1,0 +1,16 @@
+services:
+
+  tapes:
+    build: .
+    image: tapes:latest
+    restart: unless-stopped
+    environment:
+      - STORAGE_PATH=/data/cameras
+      - PASSWORDS_PATH=/opt/tapes/passwords
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/cameras:/data/cameras
+      - ./passwords:/opt/tapes/passwords:ro
