@@ -1,22 +1,61 @@
-`tapes` is a web application for viewing security camera recordings. It's built to be one component It is used in conjunction with `ffmpeg` to capture a camera's video output to a sequence of mp4 files. I'm also using `mediamtx` to proxy the streams from the camera and run the processes to capture recordings and `homebridge` to consume the rtsp stream from the proxy and publish it to my iPhone's Home app.
+# Tapes - Security Camera Recording & Event Management System
 
-I'm running this on a Debian 12 server.
+Tapes is a production-ready web application for viewing and managing security camera recordings and events. Built with a Go backend and React frontend, it provides complete dual-mode operation for continuous recordings and event-triggered captures with Docker deployment.
 
-### FFMPEG
+## Current Status
 
-FFMpeg is used for a bunch of things. Most visibly, it's being used to capture the rtsp to 15 minute video recordings.
+### ✅ Production Ready (July 2025)
+- **Complete Dual-Mode System**: recordings + events fully operational
+- **Docker Deployment**: two-stage build with production optimization  
+- **Three-Control Interface**: camera/date/type selector with responsive layout
+- **Background Processing**: automatic thumbnail generation (no file deletion)
+- **API Complete**: all endpoints active and tested
+- **Authentication**: JWT with htpasswd integration
 
-install ffmpeg
-```
+## Features
+
+- **Dual Mode Operation**: seamless switching between continuous recordings and event-triggered captures
+- **Multi-Camera Support**: view recordings/events from multiple cameras with easy selection
+- **Date-Based Navigation**: browse historical footage by date with thumbnail previews
+- **Automatic Thumbnail Generation**: background processing creates thumbnails for all videos
+- **Event Classification**: events categorized by type (motion, person, vehicle, etc.)
+- **Responsive UI**: modern React interface with Bootstrap styling optimized for mobile
+- **JWT Authentication**: secure access with htpasswd-based user management
+- **Docker Ready**: production containerization with security best practices
+
+## Architecture
+
+### Recording vs Events
+- **Recordings**: continuous 15-minute MP4 segments captured via FFmpeg (format: `YYYYMMDDHHMMSS.mp4`)
+- **Events**: motion/AI-triggered shorter clips with classification (format: `YYYYMMDDHHMMSS-eventtype.mp4`)
+- **Unified Interface**: single UI to browse both types with seamless mode switching
+- **Thumbnail Generation**: automatic .jpg creation for all video files
+
+### Tech Stack  
+- **Backend**: Go 1.22 with Gorilla Mux router
+- **Frontend**: React 18 with TypeScript and Bootstrap 5
+- **Video Processing**: FFmpeg + OpenCV (GoCV) for thumbnail generation
+- **Streaming**: MediaMTX for RTSP proxy and process management
+- **Deployment**: Docker with two-stage build (Node.js/Go builder, minimal runtime)
+- **Storage**: file-based with automatic thumbnail processing
+
+## System Dependencies
+
+This application integrates with several components to provide a complete security camera solution:
+
+### FFmpeg
+FFmpeg handles video capture and processing.
+
+Install ffmpeg:
+```bash
 sudo apt install ffmpeg
 ```
 
 ### MediaMTX
+MediaMTX proxies RTSP streams and manages recording processes.
 
-MediaMTX is used to proxy the RTSP stream from the individual cameras. This allows a single connection to the camera across the network with multiple connections to the proxy from processes running on this machine.
-
-install mediamtx
-```
+Install MediaMTX:
+```bash
 sudo su
 mkdir /opt/mediamtx
 wget https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_v1.11.3_linux_amd64.tar.gz
@@ -24,130 +63,267 @@ tar -xzf mediamtx_v1.11.3_linux_amd64.tar.gz
 exit
 ```
 
-https://github.com/bluenviron/mediamtx
-
-add configuration for a camera in mediamtx.yml
-```
-  cameraname:
+**Configuration Example** (mediamtx.yml):
+```yaml
+  garage:
     source: rtsp://user:password@192.168.100.101:554/live/ch0
-    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/cameraname -c copy -f segment -segment_format mp4 -segment_time 600 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /opt/recordings/cameraname/%Y%m%d%H%M%S.mp4
+    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/garage -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/garage/recordings/%Y%m%d%H%M%S.mp4
+    runOnReadyRestart: yes
+  
+  kitchen:
+    source: rtsp://user:password@192.168.100.102:554/live/ch0
+    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/kitchen -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/kitchen/recordings/%Y%m%d%H%M%S.mp4
     runOnReadyRestart: yes
 ```
 
-This configuration will setup a proxy to the RTSP source specified in the `source` config. This will be a rtsp url which can/should also include credentials when necessary.
+*Note: Recordings are captured in 15-minute (900 second) segments for optimal storage and playback.*
 
-Additionally, we're using the `runOnReady` config to run ffmpeg to capture archive footage from the camera in 5 minute intervals. Leveraging `runOnReady` allows a mechanism for managing the ffmpeg processes for each camera without having to implement a seperate solution to manage those processes such as systemd or supervisor.
+### HomeKit Integration
+HomeBridge exposes cameras for real-time viewing in Apple HomeKit.
 
-
-### HomeBridge
-
-HomeBridge is used to expose the cameras for real time viewing in Apple HomeKit.
-
-install homebridge
-```
+Install Homebridge:
+```bash
 cd /tmp
-curl -sSfL https://repo.homebridge.io/KEY.gpg | sudo gpg --dearmor | sudo tee /usr/share/keyrings/homebridge.gpg  > /dev/null
+curl -sSfL https://repo.homebridge.io/KEY.gpg | sudo gpg --dearmor | sudo tee /usr/share/keyrings/homebridge.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/homebridge.gpg] https://repo.homebridge.io stable main" | sudo tee /etc/apt/sources.list.d/homebridge.list > /dev/null
 sudo apt update
 sudo apt install homebridge
 ```
 
-https://github.com/homebridge/homebridge/wiki
+Setup via UI at http://server-ip:8581 and install "Homebridge Camera FFmpeg" plugin.
 
-setup after install via ui @ http://<server ip>:8581
-
-add the "Homebridge Camera FFmpeg" plugin via search
-
-add cameras in plugin config json
-```
-  {
-    "name": "cameraname",
-    "videoConfig": {
-      "source": "-i rtsp://localhost:8554/cameraname"
-    }
-  },
+**Camera Configuration**:
+```json
+{
+  "name": "garage",
+  "videoConfig": {
+    "source": "-i rtsp://localhost:8554/garage"
+  }
+}
 ```
 
-### GoCV
+### OpenCV (GoCV)
+Required for thumbnail generation and video processing.
 
-tapes will use GoCV, and
-
-https://github.com/hybridgroup/gocv
-
-We're going to need Open CV 4.10 installed. Build this from source.
-
-```
+Install OpenCV 4.10:
+```bash
 sudo su
 mkdir /opt/gocv
 cd /opt/gocv
 
-
-wget -O /opencv.zip https://github.com/opencv/opencv/archive/4.10.0.zip
-unzip /opencv.zip
+wget -O opencv.zip https://github.com/opencv/opencv/archive/4.10.0.zip
+unzip opencv.zip
 mkdir build
 cd build
-cmake -D HAVE_FFMPEG=ON -D OPENCV_GENERATE_PKGCONFIG=YES -D OPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.10.0/modules ../opencv-4.10.0
+cmake -D HAVE_FFMPEG=ON -D OPENCV_GENERATE_PKGCONFIG=YES ../opencv-4.10.0
 cmake --build .
 make install
 ```
 
-This takes a while. It takes a while natively. It takes a while in a Docker build. Go do something else while it compiles.
+*Note: This compilation process takes significant time. Consider using pre-built packages if available.*
 
-https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html
+## Quick Start (Docker - Recommended)
 
-
-### Tapes
-
-Tapes is used to provide a web application for browsing and viewing video recordings.
-
-Clone the repository
-```
+### 1. Clone Repository
+```bash
 git clone git@github.com:vicgarcia/tapes.git
+cd tapes
 ```
 
-Install htpasswd to generate the auth database
-```
-sudo apt install apache2-utils
-```
+### 2. Setup Environment
+```bash
+# create environment file from template
+cp .env.template .env
 
-To setup for local development, see the Dockerfile for dependencies.
-
-The `Dockerfile` in this repository is used to build an image with the necessary tools install to build the `tapes` application. This includes Node, Golang, and OpenCV.
-
-```
-docker build -t tapes-builder .
+# edit .env with your settings (minimum: JWT_KEY)
+nano .env
 ```
 
-Once the container is built, it can be run to build the `tapes` application. The binary executable will be available in the root of this repository once complete. Once built, the application can be installed. The container build takes a while to compile opencv.
+### 3. Create Directory Structure
+```bash
+# create camera directories
+mkdir -p data/cameras/{garage,kitchen,study}/{recordings,events}
 
-Install tapes
-```
-sudo su
-mkdir /opt/tapes
-```
-
-Copy tapes from wherever it's built to /opt/tapes/tapes
-
-Setup env vars
-```
-vim /opt/tapes/env
----
-RECORDING_PATH=/opt/recordings
-PASSWORDS_PATH=/opt/tapes/passwords
-JWT_KEY=<random 64 char string>
+# create htpasswd file for authentication
+htpasswd -c passwords admin
 ```
 
-Create a user in the password file
+### 4. Deploy with Docker
+```bash
+# build and run with docker compose
+docker-compose up --build -d
+
+# check logs
+docker logs tapes
 ```
 
+The application will be available at **http://localhost:8080**
+
+### 5. Add Video Files
+Place video files in the appropriate directories:
+- **Recordings**: `data/cameras/{camera}/recordings/YYYYMMDDHHMMSS.mp4`
+- **Events**: `data/cameras/{camera}/events/YYYYMMDDHHMMSS-eventtype.mp4`
+
+Thumbnails will be automatically generated on the next hourly background process.
+
+## Manual Installation (Advanced)
+
+For non-Docker deployment, you'll need to install dependencies and build manually:
+
+### Dependencies
+```bash
+sudo apt install apache2-utils ffmpeg
+# install go 1.22, node.js 23, opencv 4.10 (see system dependencies section)
 ```
 
-Run tapes
+### Build & Deploy
+```bash
+# build frontend
+cd ui && npm install && npm run build
+
+# build backend  
+cd api && go build -o tapes .
+
+# create directories and copy files
+sudo mkdir -p /opt/tapes /data/cameras
+sudo cp tapes /opt/tapes/
+sudo cp .env /opt/tapes/
+
+# run application
+cd /opt/tapes && ./tapes
 ```
-cd /opt/tapes
-./tapes
+
+The application will be available at **http://localhost:8080**
+
+## File Structure
+
+```
+/data/cameras/
+├── garage/
+│   ├── recordings/     # Continuous 15-minute segments
+│   │   ├── 20250720143000.mp4
+│   │   ├── 20250720143000.jpg  (thumbnail)
+│   │   └── ...
+│   └── events/         # Event-triggered clips
+│       ├── 20250720143045-motion.mp4
+│       ├── 20250720143045-motion.jpg
+│       └── ...
+├── kitchen/
+│   ├── recordings/
+│   └── events/
+└── study/
+    ├── recordings/
+    └── events/
 ```
 
-Running this as a service is left to your imagination.
+## API Endpoints
 
+All endpoints require JWT authentication via `Authorization: Bearer <token>` header.
 
+### Authentication
+- `POST /login` - user authentication with htpasswd credentials
+- `POST /logout` - session termination
+- `GET /auth` - validate current session
+
+### Camera Management  
+- `GET /cameras` - list all available cameras
+
+### Recordings (Complete)
+- `GET /cameras/{camera}/recordings?day=YYYY-MM-DD` - get recordings for date
+- `GET /cameras/{camera}/recordings/{timestamp}/video` - stream recording video
+- `GET /cameras/{camera}/recordings/{timestamp}/thumbnail` - get recording thumbnail
+
+### Events (Complete)
+- `GET /cameras/{camera}/events?day=YYYY-MM-DD` - get events for date
+- `GET /cameras/{camera}/events/{timestamp}/video` - stream event video
+- `GET /cameras/{camera}/events/{timestamp}/thumbnail` - get event thumbnail
+
+### Frontend Interface
+
+The React frontend provides a three-control interface:
+- **Camera Select**: choose from available cameras
+- **Date Select**: browse historical footage by date  
+- **Type Select**: switch between "RECORDINGS" and "EVENTS" modes
+
+All video playback and thumbnail display automatically adapts based on the selected mode.
+
+## Development
+
+### Frontend Development
+```bash
+cd ui
+npm install
+npm run dev  # Development server
+npm run build  # Production build
+```
+
+### Backend Development
+```bash
+cd api
+go mod tidy
+go run .
+```
+
+### Build & Test Commands
+- `npm run lint` - Frontend linting
+- `npm run typecheck` - TypeScript checking
+- `go fmt ./...` - Go code formatting
+- `go test ./...` - Run Go tests
+
+## Background Processing
+
+The application runs hourly background tasks to:
+- **Generate thumbnails** for all video files that don't have them
+- **Process both recordings and events** automatically
+- **No file deletion** - all videos are preserved indefinitely
+
+### Processing Details
+- **Frequency**: every hour via background goroutine
+- **Function**: scans all camera directories for .mp4 files
+- **Action**: creates .jpg thumbnails using OpenCV when missing
+- **File preservation**: no deletion of empty files or old videos (removed July 2025)
+
+## Event Processing
+
+Events are processed with the following logic:
+- **File naming**: `{timestamp}-{event_type}.mp4` format (e.g., `20250726143045-motion.mp4`)
+- **Thumbnail generation**: same automatic processing as recordings
+- **Event types**: motion, person, vehicle, package, etc. (determined by filename)
+- **No retention policy**: all event files are preserved indefinitely
+
+## Production Deployment
+
+### Docker Production (Recommended)
+The included Docker setup provides production-ready deployment:
+- **Two-stage build**: optimized container size with minimal runtime
+- **Security**: non-root user, proper permissions
+- **Environment**: configurable via .env file
+- **Volumes**: persistent data and authentication files
+- **Health checks**: automatic container monitoring
+
+### Additional Production Considerations
+- **Reverse proxy**: use nginx for SSL/domain handling
+- **Storage monitoring**: implement capacity alerting for video directories
+- **Log management**: configure log rotation and centralized logging
+- **Backup strategy**: regular backup of htpasswd and configuration files
+- **Performance**: monitor container resources and scale if needed
+
+## Contributing
+
+This project follows standard Go and React development practices. See `CLAUDE.md` for comprehensive development context and LLM-assisted development guidelines.
+
+### Development Setup
+```bash
+# frontend development
+cd ui && npm run dev
+
+# backend development  
+cd api && go run .
+
+# code formatting
+npm run lint && npm run typecheck && go fmt ./...
+```
+
+## License
+
+[License information to be added]
