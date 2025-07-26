@@ -50,15 +50,15 @@ func main() {
 	r.HandleFunc("/cameras/{camera}/recordings", validateAuth(recordingsHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", validateAuth(recordingVideoHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", validateAuth(recordingThumbnailHandler)).Methods("GET")
-	// r.HandleFunc("/cameras/{camera}/events", validateAuth(eventsHandler)).Methods("GET")
-	// r.HandleFunc("/cameras/{camera}/events/{slug}/video", validateAuth(eventVideoHandler)).Methods("GET")
-	// r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", validateAuth(eventThumbnailHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events", validateAuth(eventsHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events/{slug}/video", validateAuth(eventVideoHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", validateAuth(eventThumbnailHandler)).Methods("GET")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
 	// create server
 	srv := &http.Server{
-		Addr:    ":8633",
+		Addr:    ":8080",
 		Handler: r,
 	}
 
@@ -76,10 +76,12 @@ func main() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		processVideos()
+		processEvents()
 		for {
 			select {
 			case <-ticker.C:
 				processVideos()
+				processEvents()
 			case <-done:
 				return
 			}

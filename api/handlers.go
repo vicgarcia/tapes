@@ -184,3 +184,92 @@ func recordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 
 	http.ServeFile(writer, request, recordingPath)
 }
+
+// events endpoint
+// query events by date
+
+func eventsHandler(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	cameraName := vars["camera"]
+	camera, err := getCamera(cameraName)
+	if err != nil {
+		http.Error(writer, "invalid camera", http.StatusBadRequest)
+		return
+	}
+
+	day := request.URL.Query().Get("day")
+	// todo: validate day
+
+	events, err := getEventsByDay(camera, day)
+	if err != nil {
+		http.Error(writer, "error querying events", http.StatusInternalServerError)
+		return
+	}
+
+	response, err := json.Marshal(events)
+	if err != nil {
+		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
+		return
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Write(response)
+}
+
+// event thumbnail endpoint
+// serve event thumbnail images, create when they do not exist
+
+func eventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	cameraName := vars["camera"]
+	timestamp := vars["timestamp"]
+
+	camera, err := getCamera(cameraName)
+	if err != nil {
+		http.Error(writer, "invalid camera", http.StatusBadRequest)
+		return
+	}
+
+	// find the event file (may have different event type suffix)
+	eventPath := getEventPath(camera, timestamp)
+	if eventPath == "" || !fileExists(eventPath) {
+		http.Error(writer, "event file does not exist", http.StatusNotFound)
+		return
+	}
+
+	// get the thumbnail, will be created if it does not already exist
+	thumbnailPath := getThumbnailPath(eventPath)
+	if !fileExists(thumbnailPath) {
+		thumbnailPath, err = generateThumbnail(eventPath)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	http.ServeFile(writer, request, thumbnailPath)
+}
+
+// event video endpoint
+// serve event video file
+
+func eventVideoHandler(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	cameraName := vars["camera"]
+	timestamp := vars["timestamp"]
+
+	camera, err := getCamera(cameraName)
+	if err != nil {
+		http.Error(writer, "invalid camera", http.StatusBadRequest)
+		return
+	}
+
+	// find the event file (may have different event type suffix)
+	eventPath := getEventPath(camera, timestamp)
+	if eventPath == "" || !fileExists(eventPath) {
+		http.Error(writer, "event file does not exist", http.StatusNotFound)
+		return
+	}
+
+	http.ServeFile(writer, request, eventPath)
+}
