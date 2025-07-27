@@ -10,7 +10,7 @@ RUN apt-get update && \
 # build react frontend
 WORKDIR /app/ui
 COPY ui/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY ui ./
 RUN npm run build
 
