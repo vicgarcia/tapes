@@ -5,8 +5,14 @@ export function getCameras() {
         .then(response => response.data);
 };
 
-export function getVideosByDate(cameraName: string, day: string) {
-    const url = `/cameras/${cameraName}`;
+export function getRecordingsByDate(cameraName: string, day: string) {
+    const url = `/cameras/${cameraName}/recordings`;
+    return httpClient.get(url, {params: { day }})
+        .then(response => response.data);
+}
+
+export function getEventsByDate(cameraName: string, day: string) {
+    const url = `/cameras/${cameraName}/events`;
     return httpClient.get(url, {params: { day }})
         .then(response => response.data);
 }

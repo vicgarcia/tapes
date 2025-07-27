@@ -59,7 +59,7 @@ func GetEventsByDay(camera cameras.Camera, day string) ([]Event, error) {
 	return events, nil
 }
 
-// GetEventPath returns the path to an event file by camera and full slug
+// GetEventPath returns the path to an event file by camera and slug
 func GetEventPath(camera cameras.Camera, slug string) string {
 	// The slug is the full filename without extension (timestamp-eventtype)
 	eventPath := filepath.Join(camera.EventsPath(), slug+".mp4")

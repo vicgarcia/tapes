@@ -5,7 +5,6 @@ import (
 	"image"
 	"os"
 	"strings"
-
 	"gocv.io/x/gocv"
 )
 

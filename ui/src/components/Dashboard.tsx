@@ -2,79 +2,129 @@ import { useState, useEffect } from 'react'
 import { Container, Row, Col, Button } from "react-bootstrap";
 import dayjs from 'dayjs';
 import { Camera, Video } from '@app/types';
-import { getVideosByDate } from '@app/services/cameras';
+import { getRecordingsByDate, getEventsByDate } from '@app/services/cameras';
 import { CameraSelect } from './CameraSelect';
 import { DateSelect } from './DateSelect';
+import { TypeSelect, MediaType } from './TypeSelect';
 import { Thumbnail } from './Thumbnail';
 import { VideoPlayer } from './VideoPlayer';
 
 export function Dashboard() {
     const [selectedDate, setSelectedDate] = useState<Date|null>(null);
     const [selectedCamera, setSelectedCamera] = useState<Camera|null>(null);
+    const [selectedType, setSelectedType] = useState<MediaType>('recordings');
     const [videos, setVideos] = useState<Array<Video>>([]);
     const [active, setActive] = useState<Video|null>(null);
 
     useEffect(() => {
         if (selectedCamera !== null && selectedDate !== null) {
-            getVideosByDate(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
+            const getMedia = selectedType === 'recordings' 
+                ? getRecordingsByDate 
+                : getEventsByDate;
+                
+            getMedia(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
                 .then(response => setVideos(response));
         }
-    }, [selectedCamera, selectedDate])
+    }, [selectedCamera, selectedDate, selectedType])
 
     return <Container>
-      <Row className='pt-4 g-5'>
+      <Row className='pt-4 pb-3'>
+        
+        {/* Desktop Layout */}
+        <Col className='d-none d-md-flex align-items-center justify-content-between'>
+          {/* Empty space on left */}
+          <div></div>
 
-        <Col lg={6} className='d-none d-lg-block'>
-            <h1><i className='bi bi-cassette header-icon'></i>tapes</h1>
+          {/* Controls - Right Side */}
+          <div className='d-flex align-items-center' style={{gap: '1rem'}}>
+            {active == null ? <>
+              <div style={{minWidth: '200px'}}>
+                <DateSelect
+                  selected={selectedDate}
+                  setSelected={setSelectedDate}
+                />
+              </div>
+              <div style={{minWidth: '200px'}}>
+                <CameraSelect
+                  selected={selectedCamera}
+                  setSelected={setSelectedCamera}
+                />
+              </div>
+              <div style={{minWidth: '200px'}}>
+                <TypeSelect
+                  selected={selectedType}
+                  setSelected={setSelectedType}
+                />
+              </div>
+            </> : <>
+              <Button 
+                variant='outline-secondary'
+                onClick={_ => setActive(null)}
+                style={{minWidth: '120px', padding: '8px 16px'}}
+              >
+                ← Back
+              </Button>
+            </>}
+          </div>
         </Col>
 
-        {active == null ? <>
-            <Col xs={6} lg={3} className='text-center'>
-                <CameraSelect
-                    selected={selectedCamera}
-                    setSelected={setSelectedCamera}
-                />
-            </Col>
-
-            <Col xs={6} lg={3} className='text-center'>
-                <DateSelect
-                    selected={selectedDate}
-                    setSelected={setSelectedDate}
-                />
-            </Col>
-        </> : <>
-            <Col xs={12} lg={6} className='text-end'>
-                <Button size='sm' className='uppercase p-2' style={{width: '200px'}}
-                    variant='outline-secondary'
-                    onClick={_ => setActive(null)}
-                >back</Button>
-            </Col>
-        </>}
+        {/* Mobile Layout */}
+        <Col className='d-md-none'>
+          {active == null ? (
+            <div className='d-flex flex-column gap-3'>
+              <DateSelect
+                selected={selectedDate}
+                setSelected={setSelectedDate}
+              />
+              <CameraSelect
+                selected={selectedCamera}
+                setSelected={setSelectedCamera}
+              />
+              <TypeSelect
+                selected={selectedType}
+                setSelected={setSelectedType}
+              />
+            </div>
+          ) : (
+            <div className='text-center'>
+              <Button 
+                variant='outline-secondary'
+                onClick={_ => setActive(null)}
+                className='w-100'
+                style={{padding: '12px'}}
+              >
+                ← Back
+              </Button>
+            </div>
+          )}
+        </Col>
 
       </Row>
 
-      <Row className='pt-4 g-5'>
-
-        <Col xs={12} lg={12} className='text-end'>
-            {active !== null ? <>
-                <VideoPlayer
-                    camera={selectedCamera!}
-                    video={active}
+      <Row className='pt-4'>
+        <Col xs={12}>
+          {active !== null ? (
+            <div className='d-flex justify-content-center'>
+              <VideoPlayer
+                camera={selectedCamera!}
+                video={active}
+                mediaType={selectedType}
+              />
+            </div>
+          ) : (
+            <Row className='g-3'>
+              {videos && videos.map(v =>
+                <Thumbnail
+                  key={`${selectedCamera!.name}-${v.timestamp}`}
+                  camera={selectedCamera!}
+                  video={v}
+                  setActive={setActive}
+                  mediaType={selectedType}
                 />
-            </> : <>
-                <Row>
-                    {videos && videos.map(v =>
-                        <Thumbnail
-                            key={`${selectedCamera!.name}-${v.timestamp}`}
-                            camera={selectedCamera!}
-                            video={v}
-                            setActive={setActive}
-                        />
-                    )}
-                </Row>
-            </>}
+              )}
+            </Row>
+          )}
         </Col>
-
       </Row>
     </Container>
 }
