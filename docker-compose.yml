@@ -14,3 +14,9 @@ services:
     volumes:
       - ./data/cameras:/data/cameras
       - ./passwords:/opt/tapes/passwords:ro
+
+networks:
+
+  default:
+    name: tapes
+    external: false

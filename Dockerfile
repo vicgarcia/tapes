@@ -1,26 +1,11 @@
-# build stage
-FROM debian:bookworm-slim AS builder
-
-# install build dependencies
-RUN apt-get clean && apt-get update && \
-    apt-get install -y curl software-properties-common cmake g++ wget unzip git sudo ca-certificates && \
-    apt-get upgrade -y
+# build
+FROM gocv/opencv:4.12.0 AS builder
 
 # install node.js
-RUN curl -sL https://deb.nodesource.com/setup_23.x | bash - && \
-    apt-get update && \
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs
-
-# install go
-RUN add-apt-repository 'deb http://deb.debian.org/debian bookworm-backports main' && \
-    apt-get update && \
-    apt-get install -y golang-1.22 && \
-    ln -s /usr/lib/go-1.22/bin/* /usr/local/bin/
-
-# install opencv and gocv
-WORKDIR /gocv
-RUN git clone https://github.com/hybridgroup/gocv.git . && \
-    make install
 
 # build react frontend
 WORKDIR /app/ui
@@ -34,40 +19,36 @@ WORKDIR /app/api
 COPY api/go.mod api/go.sum ./
 RUN go mod download
 COPY api ./
-RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-linkmode external -extldflags "-static"' -o tapes .
+RUN CGO_ENABLED=1 go build -o tapes .
 
 
-# deploy stage
-FROM debian:bookworm-slim
+# deploy
+FROM gocv/opencv:4.12.0 AS deploy
 
-# install runtime dependencies for opencv and media processing
+# install minimal runtime dependencies
 RUN apt-get update && \
     apt-get install -y \
         ca-certificates \
-        libopencv-dev \
-        libopencv-contrib-dev \
         ffmpeg \
         && rm -rf /var/lib/apt/lists/*
 
-# create app user
-RUN useradd -r -s /bin/false tapes
+# copy opencv libraries from builder
+COPY --from=builder /usr/local/lib/libopencv* /usr/local/lib/
+COPY --from=builder /usr/local/lib/pkgconfig/opencv4.pc /usr/local/lib/pkgconfig/
+RUN ldconfig
 
-# create necessary directories
-RUN mkdir -p /opt/tapes /data/cameras && \
+# create app user and directories
+RUN useradd -r -s /bin/false tapes && \
+    mkdir -p /opt/tapes /data/cameras && \
     chown -R tapes:tapes /opt/tapes /data/cameras
 
 # copy built application
 COPY --from=builder /app/api/tapes /opt/tapes/
-# COPY --from=builder /app/ui/dist /opt/tapes/ui/dist
-
-# copy .env file if it exists
-COPY .env* /opt/tapes/
 
 # switch to app user
-USER tapes
-
+# USER tapes
 WORKDIR /opt/tapes
 
-EXPOSE 8633
+EXPOSE 8080
 
 CMD ["./tapes"]

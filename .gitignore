@@ -2,19 +2,12 @@
 node_modules
 dist
 
-# env config
-.env
-
-# log output
-logs
-*.log
-*.log*
-
-# compiled binary
+# go app build
 tapes
 
-# local paths (used in development)
-.local
+# local development
+.env
+passwords
 data
 
 # junk

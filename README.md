@@ -4,11 +4,13 @@ Tapes is a production-ready web application for viewing and managing security ca
 
 ## Current Status
 
-### ✅ Production Ready (July 2025)
+### ✅ Production Ready & Refactored (July 2025)
 - **Complete Dual-Mode System**: recordings + events fully operational
-- **Docker Deployment**: two-stage build with production optimization  
+- **Modular Go Architecture**: refactored into internal packages for maintainability
+- **Unified Video Processing**: single processing pipeline for all video types
+- **Docker Deployment**: OpenCV 4.12 compatible build with gocv integration
 - **Three-Control Interface**: camera/date/type selector with responsive layout
-- **Background Processing**: automatic thumbnail generation (no file deletion)
+- **Background Processing**: streamlined thumbnail generation (no file deletion)
 - **API Complete**: all endpoints active and tested
 - **Authentication**: JWT with htpasswd integration
 
@@ -32,12 +34,12 @@ Tapes is a production-ready web application for viewing and managing security ca
 - **Thumbnail Generation**: automatic .jpg creation for all video files
 
 ### Tech Stack  
-- **Backend**: Go 1.22 with Gorilla Mux router
+- **Backend**: Go 1.22 with modular internal package architecture
 - **Frontend**: React 18 with TypeScript and Bootstrap 5
-- **Video Processing**: FFmpeg + OpenCV (GoCV) for thumbnail generation
+- **Video Processing**: FFmpeg + OpenCV 4.12 (GoCV) for thumbnail generation
 - **Streaming**: MediaMTX for RTSP proxy and process management
-- **Deployment**: Docker with two-stage build (Node.js/Go builder, minimal runtime)
-- **Storage**: file-based with automatic thumbnail processing
+- **Deployment**: Docker with gocv/opencv:4.12.0 builder, Debian runtime
+- **Storage**: file-based with unified video processing pipeline
 
 ## System Dependencies
 
@@ -105,22 +107,24 @@ Setup via UI at http://server-ip:8581 and install "Homebridge Camera FFmpeg" plu
 ### OpenCV (GoCV)
 Required for thumbnail generation and video processing.
 
-Install OpenCV 4.10:
+**Docker Deployment**: OpenCV 4.12 is automatically included via the `gocv/opencv:4.12.0` builder image.
+
+**Manual Installation** (OpenCV 4.12):
 ```bash
 sudo su
 mkdir /opt/gocv
 cd /opt/gocv
 
-wget -O opencv.zip https://github.com/opencv/opencv/archive/4.10.0.zip
+wget -O opencv.zip https://github.com/opencv/opencv/archive/4.12.0.zip
 unzip opencv.zip
 mkdir build
 cd build
-cmake -D HAVE_FFMPEG=ON -D OPENCV_GENERATE_PKGCONFIG=YES ../opencv-4.10.0
+cmake -D HAVE_FFMPEG=ON -D OPENCV_GENERATE_PKGCONFIG=YES ../opencv-4.12.0
 cmake --build .
 make install
 ```
 
-*Note: This compilation process takes significant time. Consider using pre-built packages if available.*
+*Note: Docker deployment is recommended as it eliminates OpenCV version compatibility issues.*
 
 ## Quick Start (Docker - Recommended)
 
@@ -272,15 +276,17 @@ go run .
 
 ## Background Processing
 
-The application runs hourly background tasks to:
+The application runs a unified hourly background task to:
 - **Generate thumbnails** for all video files that don't have them
-- **Process both recordings and events** automatically
+- **Process recordings and events** through single pipeline
+- **Smart file handling** - skips most recent file (actively recording)
 - **No file deletion** - all videos are preserved indefinitely
 
 ### Processing Details
 - **Frequency**: every hour via background goroutine
-- **Function**: scans all camera directories for .mp4 files
-- **Action**: creates .jpg thumbnails using OpenCV when missing
+- **Function**: ProcessAllVideos() scans all camera directories uniformly
+- **Action**: creates .jpg thumbnails using OpenCV 4.12 when missing
+- **Architecture**: unified processing eliminates code duplication
 - **File preservation**: no deletion of empty files or old videos (removed July 2025)
 
 ## Event Processing
