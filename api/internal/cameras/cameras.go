@@ -1,4 +1,4 @@
-package main
+package cameras
 
 import (
 	"fmt"
@@ -6,33 +6,34 @@ import (
 	"path/filepath"
 )
 
-// Camera object
+// Camera represents a camera with its storage paths
 type Camera struct {
 	Path string `json:"-"`
 	Name string `json:"name"`
 }
 
+// RecordingsPath returns the path to recordings for this camera
 func (c Camera) RecordingsPath() string {
 	return filepath.Join(c.Path, "recordings")
 }
 
+// EventsPath returns the path to events for this camera
 func (c Camera) EventsPath() string {
 	return filepath.Join(c.Path, "events")
 }
 
-// get path to saved recording files from env var
-func getStoragePath() (string, error) {
+// GetStoragePath returns the base storage path from environment variable
+func GetStoragePath() (string, error) {
 	storagePath := os.Getenv("STORAGE_PATH")
 	if storagePath == "" {
 		return "", fmt.Errorf("missing STORAGE_PATH environment variable")
 	}
-
 	return storagePath, nil
 }
 
-// get a list of camera objects from video path folders
-func getCameras() ([]Camera, error) {
-	storagePath, err := getStoragePath()
+// GetAll returns a list of all available cameras
+func GetAll() ([]Camera, error) {
+	storagePath, err := GetStoragePath()
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +52,9 @@ func getCameras() ([]Camera, error) {
 	return cameras, nil
 }
 
-// get a camera object by its name as a string
-func getCamera(cameraName string) (Camera, error) {
-	storagePath, err := getStoragePath()
+// GetByName returns a camera by its name
+func GetByName(cameraName string) (Camera, error) {
+	storagePath, err := GetStoragePath()
 	if err != nil {
 		return Camera{}, err
 	}

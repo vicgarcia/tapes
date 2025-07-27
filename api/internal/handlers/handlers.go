@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -6,33 +6,31 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+
+	"github.com/vicgarcia/tapes/internal/auth"
+	"github.com/vicgarcia/tapes/internal/cameras"
+	"github.com/vicgarcia/tapes/internal/media"
 )
 
-// health check endpoint
-// returns 200 with no content
-
-func healthHandler(writer http.ResponseWriter, request *http.Request) {
+// HealthHandler returns 200 with no content for health checks
+func HealthHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	writer.Write([]byte(`{"status": "success"}`))
 }
 
-// authentication check endpoint
-// returns status to indicate validity of authentication cookie
-
-func authHandler(writer http.ResponseWriter, request *http.Request) {
+// AuthHandler returns status to indicate validity of authentication cookie
+func AuthHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
 	writer.Write([]byte(`{"status": "success"}`))
 }
 
-// login endpoint
-// sets auth cookie on successful authentication
-
-func loginHandler(writer http.ResponseWriter, request *http.Request) {
+// LoginHandler sets auth cookie on successful authentication
+func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
 
-	passwd, err := getPasswd()
+	passwd, err := auth.GetPasswd()
 	if err != nil {
 		log.Fatal(err)
 		http.Error(writer, "login failed", http.StatusInternalServerError)
@@ -52,7 +50,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	err = setCookie(writer, username)
+	err = auth.SetCookie(writer, username)
 	if err != nil {
 		log.Fatal(err)
 		http.Error(writer, "login failed", http.StatusUnauthorized)
@@ -64,11 +62,9 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write([]byte(`{"status": "success"}`))
 }
 
-// logout endpoint
-// clear auth cookie
-
-func logoutHandler(writer http.ResponseWriter, request *http.Request) {
-	err := deleteCookie(writer)
+// LogoutHandler clears the auth cookie
+func LogoutHandler(writer http.ResponseWriter, request *http.Request) {
+	err := auth.DeleteCookie(writer)
 	if err != nil {
 		log.Fatal(err)
 		http.Error(writer, "logout failed", http.StatusUnauthorized)
@@ -79,11 +75,9 @@ func logoutHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write([]byte(`{"status": "success"}`))
 }
 
-// cameras endpoint
-// returns json list of cameras
-
-func camerasHandler(writer http.ResponseWriter, request *http.Request) {
-	cameras, err := getCameras()
+// CamerasHandler returns json list of cameras
+func CamerasHandler(writer http.ResponseWriter, request *http.Request) {
+	cameras, err := cameras.GetAll()
 	if err != nil {
 		http.Error(writer, "error querying cameras", http.StatusInternalServerError)
 		return
@@ -99,13 +93,11 @@ func camerasHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(response)
 }
 
-// camera endpoint
-// query recordings by date
-
-func recordingsHandler(writer http.ResponseWriter, request *http.Request) {
+// RecordingsHandler queries recordings by date
+func RecordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
@@ -114,7 +106,7 @@ func recordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	day := request.URL.Query().Get("day")
 	// todo: validate day
 
-	recordings, err := getRecordingsByDay(camera, day)
+	recordings, err := media.GetRecordingsByDay(camera, day)
 	if err != nil {
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
@@ -130,30 +122,28 @@ func recordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(response)
 }
 
-// thumbnail endpoint
-// serve video thumbnail images, create when they do not exist
-
-func recordingThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
+// RecordingThumbnailHandler serves video thumbnail images, creates when they do not exist
+func RecordingThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
 	// check if the video file exists outside of getThumbnail to manage error status
-	recordingPath := getRecordingPath(camera, timestamp)
-	if !fileExists(recordingPath) {
+	recordingPath := media.GetRecordingPath(camera, timestamp)
+	if !media.FileExists(recordingPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
 	// get the thumbnail, will be created if it does not already exist
-	thumbnailPath := getThumbnailPath(recordingPath)
-	if !fileExists(thumbnailPath) {
-		thumbnailPath, err = generateThumbnail(recordingPath)
+	thumbnailPath := media.GetThumbnailPath(recordingPath)
+	if !media.FileExists(thumbnailPath) {
+		thumbnailPath, err = media.GenerateThumbnail(recordingPath)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
@@ -163,35 +153,31 @@ func recordingThumbnailHandler(writer http.ResponseWriter, request *http.Request
 	http.ServeFile(writer, request, thumbnailPath)
 }
 
-// video endpoint
-// serve video file
-
-func recordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
+// RecordingVideoHandler serves video files
+func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
-	recordingPath := getRecordingPath(camera, timestamp)
-	if !fileExists(recordingPath) {
+	recordingPath := media.GetRecordingPath(camera, timestamp)
+	if !media.FileExists(recordingPath) {
 		http.Error(writer, "video file does not exist", http.StatusNotFound)
 	}
 
 	http.ServeFile(writer, request, recordingPath)
 }
 
-// events endpoint
-// query events by date
-
-func eventsHandler(writer http.ResponseWriter, request *http.Request) {
+// EventsHandler queries events by date
+func EventsHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
@@ -200,7 +186,7 @@ func eventsHandler(writer http.ResponseWriter, request *http.Request) {
 	day := request.URL.Query().Get("day")
 	// todo: validate day
 
-	events, err := getEventsByDay(camera, day)
+	events, err := media.GetEventsByDay(camera, day)
 	if err != nil {
 		http.Error(writer, "error querying events", http.StatusInternalServerError)
 		return
@@ -216,31 +202,29 @@ func eventsHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Write(response)
 }
 
-// event thumbnail endpoint
-// serve event thumbnail images, create when they do not exist
-
-func eventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
+// EventThumbnailHandler serves event thumbnail images, creates when they do not exist
+func EventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
 	// find the event file (may have different event type suffix)
-	eventPath := getEventPath(camera, timestamp)
-	if eventPath == "" || !fileExists(eventPath) {
+	eventPath := media.GetEventPath(camera, timestamp)
+	if eventPath == "" || !media.FileExists(eventPath) {
 		http.Error(writer, "event file does not exist", http.StatusNotFound)
 		return
 	}
 
 	// get the thumbnail, will be created if it does not already exist
-	thumbnailPath := getThumbnailPath(eventPath)
-	if !fileExists(thumbnailPath) {
-		thumbnailPath, err = generateThumbnail(eventPath)
+	thumbnailPath := media.GetThumbnailPath(eventPath)
+	if !media.FileExists(thumbnailPath) {
+		thumbnailPath, err = media.GenerateThumbnail(eventPath)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
@@ -250,23 +234,21 @@ func eventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	http.ServeFile(writer, request, thumbnailPath)
 }
 
-// event video endpoint
-// serve event video file
-
-func eventVideoHandler(writer http.ResponseWriter, request *http.Request) {
+// EventVideoHandler serves event video files
+func EventVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	camera, err := getCamera(cameraName)
+	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
 	// find the event file (may have different event type suffix)
-	eventPath := getEventPath(camera, timestamp)
-	if eventPath == "" || !fileExists(eventPath) {
+	eventPath := media.GetEventPath(camera, timestamp)
+	if eventPath == "" || !media.FileExists(eventPath) {
 		http.Error(writer, "event file does not exist", http.StatusNotFound)
 		return
 	}

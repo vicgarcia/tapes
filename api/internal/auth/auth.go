@@ -1,4 +1,4 @@
-package main
+package auth
 
 import (
 	"fmt"
@@ -10,9 +10,10 @@ import (
 	"github.com/tg123/go-htpasswd"
 )
 
-// load passwords file for use validating passwords
+const cookieName = "tapes"
 
-func getPasswd() (*htpasswd.File, error) {
+// GetPasswd loads the htpasswd file for password validation
+func GetPasswd() (*htpasswd.File, error) {
 	passwdPath := os.Getenv("PASSWORDS_PATH")
 	if passwdPath == "" {
 		return &htpasswd.File{}, fmt.Errorf("missing PASSWORDS_PATH environment variable")
@@ -26,9 +27,8 @@ func getPasswd() (*htpasswd.File, error) {
 	return passwd, nil
 }
 
-// generate jwt token
-
-func generateJwtToken(username string) (string, error) {
+// GenerateJWTToken creates a new JWT token for the given username
+func GenerateJWTToken(username string) (string, error) {
 	issuer := os.Getenv("JWT_ISSUER")
 	if issuer == "" {
 		issuer = "tapes"
@@ -57,9 +57,8 @@ func generateJwtToken(username string) (string, error) {
 	return signedToken, nil
 }
 
-// parse jwt token
-
-func parseJwtToken(tokenString string) (*jwt.Token, error) {
+// ParseJWTToken parses and validates a JWT token string
+func ParseJWTToken(tokenString string) (*jwt.Token, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		key := os.Getenv("JWT_KEY")
 		if key == "" {
@@ -70,14 +69,9 @@ func parseJwtToken(tokenString string) (*jwt.Token, error) {
 	return token, err
 }
 
-// handle cookies
-
-const cookieName = "tapes"
-
-// set cookie
-
-func setCookie(writer http.ResponseWriter, username string) error {
-	jwtToken, err := generateJwtToken(username)
+// SetCookie sets the authentication cookie with JWT token
+func SetCookie(writer http.ResponseWriter, username string) error {
+	jwtToken, err := GenerateJWTToken(username)
 	if err != nil {
 		return err
 	}
@@ -95,9 +89,8 @@ func setCookie(writer http.ResponseWriter, username string) error {
 	return nil
 }
 
-// delete cookie
-
-func deleteCookie(writer http.ResponseWriter) error {
+// DeleteCookie removes the authentication cookie
+func DeleteCookie(writer http.ResponseWriter) error {
 	http.SetCookie(writer, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
@@ -111,9 +104,8 @@ func deleteCookie(writer http.ResponseWriter) error {
 	return nil
 }
 
-// middleware to validate jwt token in cookie
-
-func validateAuth(next http.HandlerFunc) http.HandlerFunc {
+// ValidateAuth is middleware to validate JWT token in cookie
+func ValidateAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
@@ -121,7 +113,7 @@ func validateAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		token, err := parseJwtToken(cookie.Value)
+		token, err := ParseJWTToken(cookie.Value)
 		if err != nil || !token.Valid {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

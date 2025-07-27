@@ -11,7 +11,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
+	// "github.com/joho/godotenv"
+
+	"github.com/vicgarcia/tapes/internal/auth"
+	"github.com/vicgarcia/tapes/internal/handlers"
+	"github.com/vicgarcia/tapes/internal/media"
 )
 
 // static files
@@ -26,12 +30,12 @@ func main() {
 	log.SetOutput(os.Stdout)
 
 	// load .env file from the same path as the executable
-	log.Println("loading environment config")
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("error loading .env file : %v", err)
-		return
-	}
+	// log.Println("loading environment config")
+	// err := godotenv.Load(".env")
+	// if err != nil {
+	// 	log.Fatalf("error loading .env file : %v", err)
+	// 	return
+	// }
 
 	// create signal channel for graceful shutdown from os signal
 	stop := make(chan os.Signal, 1)
@@ -42,17 +46,17 @@ func main() {
 
 	// setup router
 	r := mux.NewRouter()
-	r.HandleFunc("/health", healthHandler).Methods("GET")
-	r.HandleFunc("/login", loginHandler).Methods("POST")
-	r.HandleFunc("/logout", logoutHandler).Methods("POST")
-	r.HandleFunc("/auth", validateAuth(authHandler)).Methods("GET")
-	r.HandleFunc("/cameras", validateAuth(camerasHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/recordings", validateAuth(recordingsHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", validateAuth(recordingVideoHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", validateAuth(recordingThumbnailHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events", validateAuth(eventsHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/video", validateAuth(eventVideoHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", validateAuth(eventThumbnailHandler)).Methods("GET")
+	r.HandleFunc("/health", handlers.HealthHandler).Methods("GET")
+	r.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
+	r.HandleFunc("/logout", handlers.LogoutHandler).Methods("POST")
+	r.HandleFunc("/auth", auth.ValidateAuth(handlers.AuthHandler)).Methods("GET")
+	r.HandleFunc("/cameras", auth.ValidateAuth(handlers.CamerasHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings", auth.ValidateAuth(handlers.RecordingsHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", auth.ValidateAuth(handlers.RecordingVideoHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", auth.ValidateAuth(handlers.RecordingThumbnailHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events", auth.ValidateAuth(handlers.EventsHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events/{slug}/video", auth.ValidateAuth(handlers.EventVideoHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", auth.ValidateAuth(handlers.EventThumbnailHandler)).Methods("GET")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
@@ -75,13 +79,11 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		processVideos()
-		processEvents()
+		media.ProcessAllVideos()
 		for {
 			select {
 			case <-ticker.C:
-				processVideos()
-				processEvents()
+				media.ProcessAllVideos()
 			case <-done:
 				return
 			}
