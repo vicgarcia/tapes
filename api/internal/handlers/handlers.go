@@ -99,14 +99,16 @@ func CamerasHandler(writer http.ResponseWriter, request *http.Request) {
 func RecordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
+	day := request.URL.Query().Get("day")
+
+	logger.Debug(fmt.Sprintf("RecordingsHandler called for camera=%s, day=%s", cameraName, day))
+
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
+		logger.Error(fmt.Sprintf("invalid camera %s: %v", cameraName, err))
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
-
-	day := request.URL.Query().Get("day")
-	// todo: validate day
 
 	recordings, err := media.GetRecordingsByDay(camera, day)
 	if err != nil {
@@ -133,6 +135,8 @@ func RecordingThumbnailHandler(writer http.ResponseWriter, request *http.Request
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
+
+	logger.Debug(fmt.Sprintf("RecordingThumbnailHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -165,6 +169,8 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
+	logger.Debug(fmt.Sprintf("RecordingVideoHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
+
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
@@ -183,8 +189,13 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 func EventsHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
+	day := request.URL.Query().Get("day")
+
+	logger.Debug(fmt.Sprintf("EventsHandler called for camera=%s, day=%s", cameraName, day))
+
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
+		logger.Error(fmt.Sprintf("invalid camera %s: %v", cameraName, err))
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
@@ -215,7 +226,9 @@ func EventsHandler(writer http.ResponseWriter, request *http.Request) {
 func EventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-	timestamp := vars["timestamp"]
+	slug := vars["slug"]
+
+	logger.Debug(fmt.Sprintf("EventThumbnailHandler called for camera=%s, slug=%s", cameraName, slug))
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -223,8 +236,8 @@ func EventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// find the event file (may have different event type suffix)
-	eventPath := media.GetEventPath(camera, timestamp)
+	// find the event file using the full slug
+	eventPath := media.GetEventPath(camera, slug)
 	if eventPath == "" || !media.FileExists(eventPath) {
 		http.Error(writer, "event file does not exist", http.StatusNotFound)
 		return
@@ -247,7 +260,9 @@ func EventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
 func EventVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-	timestamp := vars["timestamp"]
+	slug := vars["slug"]
+	
+	logger.Debug(fmt.Sprintf("EventVideoHandler called for camera=%s, slug=%s", cameraName, slug))
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -255,12 +270,15 @@ func EventVideoHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// find the event file (may have different event type suffix)
-	eventPath := media.GetEventPath(camera, timestamp)
+	// find the event file using the full slug
+	eventPath := media.GetEventPath(camera, slug)
+	logger.Debug(fmt.Sprintf("EventVideoHandler eventPath=%s, exists=%v", eventPath, media.FileExists(eventPath)))
 	if eventPath == "" || !media.FileExists(eventPath) {
+		logger.Error(fmt.Sprintf("Event file not found: path=%s", eventPath))
 		http.Error(writer, "event file does not exist", http.StatusNotFound)
 		return
 	}
 
+	logger.Debug(fmt.Sprintf("EventVideoHandler serving file: %s", eventPath))
 	http.ServeFile(writer, request, eventPath)
 }
