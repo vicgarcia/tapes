@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8080:8080"
+      - "8671:8671"
     volumes:
       - ./data/cameras:/data/cameras
       - ./passwords:/opt/tapes/passwords:ro
