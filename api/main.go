@@ -69,7 +69,7 @@ func main() {
 
 	// start http server in a goroutine
 	go func() {
-		logger.Info("starting http server on :8080")
+		logger.Info("starting http server on :8671")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("http server error " + err.Error())
 		}
