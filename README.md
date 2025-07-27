@@ -239,15 +239,18 @@ All endpoints require JWT authentication via `Authorization: Bearer <token>` hea
 
 ### Events (Complete)
 - `GET /cameras/{camera}/events?day=YYYY-MM-DD` - get events for date
-- `GET /cameras/{camera}/events/{timestamp}/video` - stream event video
-- `GET /cameras/{camera}/events/{timestamp}/thumbnail` - get event thumbnail
+- `GET /cameras/{camera}/events/{slug}/video` - stream event video (slug = timestamp-eventtype)
+- `GET /cameras/{camera}/events/{slug}/thumbnail` - get event thumbnail (slug = timestamp-eventtype)
 
 ### Frontend Interface
 
-The React frontend provides a three-control interface:
-- **Camera Select**: choose from available cameras
-- **Date Select**: browse historical footage by date  
-- **Type Select**: switch between "RECORDINGS" and "EVENTS" modes
+The React frontend provides a clean, responsive interface:
+- **Three-Control Header**: Camera, Date, and Type selectors on desktop
+- **Mobile Responsive**: Controls stack vertically on tablets/phones
+- **Type Switching**: seamless switching between "RECORDINGS" and "EVENTS" modes
+- **Video Codec Support**: Recordings (H.264) play natively, Events (MPEG-4) may require browser support
+- **Thumbnail Grid**: automatic thumbnail generation and display
+- **Professional Design**: clean header layout with proper spacing and mobile optimization
 
 All video playback and thumbnail display automatically adapts based on the selected mode.
 

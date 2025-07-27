@@ -5,14 +5,17 @@ Tapes is a production-ready security camera recording and event management syste
 
 ## Current System Status (July 2025)
 
-### ✅ PRODUCTION READY - FULLY IMPLEMENTED
-- **Complete Dual-Mode System**: Recordings + Events fully operational
-- **Docker Deployment**: Two-stage build with production optimization
-- **Background Processing**: Thumbnail generation only (file deletion removed)
-- **Three-Control Interface**: Camera/Date/Type selector with responsive layout
-- **API Complete**: All endpoints active and tested
+### ✅ PRODUCTION READY - FULLY IMPLEMENTED & DEPLOYED
+- **Complete Dual-Mode System**: Recordings + Events fully operational with proper slug handling
+- **Modular Go Architecture**: Refactored into internal packages for maintainability
+- **Unified Video Processing**: Single processing pipeline for all video types
+- **Docker Deployment**: OpenCV 4.12 compatible build with gocv integration
+- **Background Processing**: Full thumbnail generation enabled (no file deletion)
+- **Responsive UI**: Clean header layout with mobile-first design, professional spacing
+- **API Complete**: All endpoints active with correct event slug format (timestamp-eventtype)
 - **Authentication**: JWT with htpasswd integration
-- **Video Processing**: OpenCV thumbnail generation, FFmpeg integration
+- **Video Processing**: OpenCV 4.12 thumbnail generation fully restored and functional
+- **Event Video Support**: Backend correctly serves MPEG-4 event videos (browser compatibility varies)
 
 ## Development Commands
 
@@ -40,12 +43,23 @@ Always run these commands after making changes:
 
 ```
 tapes/
-├── api/                          # go backend
-│   ├── main.go                  # main application & routes (lines 53-55: events endpoints ACTIVE)
-│   ├── handlers.go              # http handlers (eventsHandler, eventVideoHandler, eventThumbnailHandler)
-│   ├── auth.go                  # jwt authentication
-│   ├── media.go                 # video/thumbnail processing (lines 187-208, 325-337: processVideo/processEvent)
-│   └── cameras.go               # camera management (consolidated)
+├── api/                          # go backend (refactored modular architecture)
+│   ├── main.go                  # main application & routes (using internal packages)
+│   ├── internal/                # internal go packages (private)
+│   │   ├── auth/                # authentication & jwt handling
+│   │   │   └── auth.go          # htpasswd, jwt tokens, middleware
+│   │   ├── cameras/             # camera management
+│   │   │   └── cameras.go       # Camera struct, discovery, paths
+│   │   ├── handlers/            # http request handlers
+│   │   │   └── handlers.go      # all API endpoints (auth, cameras, recordings, events)
+│   │   └── media/               # video & thumbnail processing (modular)
+│   │       ├── types.go         # Video, Recording, Event structs
+│   │       ├── recordings.go    # recording-specific operations
+│   │       ├── events.go        # event-specific operations
+│   │       ├── thumbnails.go    # thumbnail generation with OpenCV
+│   │       └── processing.go    # unified video processing pipeline
+│   ├── go.mod                   # go module definition
+│   └── go.sum                   # go module checksums
 ├── ui/                          # react frontend
 │   ├── src/components/
 │   │   ├── Dashboard.tsx        # main interface with 3-control layout
@@ -60,7 +74,7 @@ tapes/
 │   └── {camera}/
 │       ├── recordings/          # 15-min continuous segments
 │       └── events/              # event-triggered clips
-├── Dockerfile                   # two-stage production build
+├── Dockerfile                   # two-stage build with OpenCV 4.12 (gocv/opencv:4.12.0)
 ├── docker-compose.yml           # production deployment config
 ├── .env.template               # environment configuration template
 ├── README.md                   # project documentation
@@ -70,56 +84,65 @@ tapes/
 
 ## Complete Implementation Status
 
-### ✅ Backend Implementation (Go) - COMPLETE
-- **Events API Endpoints**: All active in main.go:53-55
+### ✅ Backend Implementation (Go) - REFACTORED & COMPLETE
+- **Modular Architecture**: Moved to internal packages (auth/, cameras/, handlers/, media/)
+- **Events API Endpoints**: All active in main.go using handlers package
   ```go
-  r.HandleFunc("/cameras/{camera}/events", validateAuth(eventsHandler)).Methods("GET")
-  r.HandleFunc("/cameras/{camera}/events/{slug}/video", validateAuth(eventVideoHandler)).Methods("GET")
-  r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", validateAuth(eventThumbnailHandler)).Methods("GET")
+  r.HandleFunc("/cameras/{camera}/events", auth.ValidateAuth(handlers.EventsHandler)).Methods("GET")
+  r.HandleFunc("/cameras/{camera}/events/{slug}/video", auth.ValidateAuth(handlers.EventVideoHandler)).Methods("GET")
+  r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", auth.ValidateAuth(handlers.EventThumbnailHandler)).Methods("GET")
   ```
-- **Event Handlers**: eventsHandler, eventVideoHandler, eventThumbnailHandler in handlers.go
-- **Media Processing**: getEventsByDate, getEventPath, processEvent functions in media.go
-- **Background Processing**: thumbnail generation for both recordings and events (no file deletion)
-- **Camera Management**: consolidated Camera struct in api/cameras.go
+- **Unified Processing**: Single ProcessAllVideos() function handles all video types
+- **Clean Separation**: Auth, cameras, handlers, and media logic properly separated
+- **Background Processing**: Streamlined thumbnail generation (no file deletion)
 
-### ✅ Frontend Implementation (React/TypeScript) - COMPLETE
+### ✅ Frontend Implementation (React/TypeScript) - COMPLETE & POLISHED
 - **TypeSelect Component**: recordings/events switcher following established patterns
-- **Dashboard Layout**: three controls (camera, date, type) with responsive grid
-- **API Integration**: separate service calls for recordings vs events
-- **Video Player**: mediaType prop for correct URL generation
-- **Thumbnail Service**: mediaType parameter for proper thumbnail URLs
+- **Professional Dashboard**: clean header with logo left, controls right, mobile responsive
+- **Mobile-First Design**: controls stack vertically on tablets/phones (md breakpoint)
+- **API Integration**: separate service calls for recordings vs events with proper slug handling
+- **Video Player**: enhanced with proper key prop, error handling, and bottom margin
+- **Thumbnail Service**: correct slug format for events (timestamp-eventtype)
+- **Event Video Handling**: proper frontend slug construction for backend compatibility
 - **Type System**: enhanced Video type with optional event_type field
+- **Responsive Layout**: seamless desktop/mobile experience with proper spacing
 
-### ✅ Docker & Deployment - COMPLETE
-- **Two-Stage Dockerfile**: builder stage with node.js/go, minimal runtime stage
+### ✅ Docker & Deployment - UPDATED & COMPLETE
+- **OpenCV 4.12 Integration**: Uses gocv/opencv:4.12.0 builder for compatibility
+- **Two-Stage Dockerfile**: Builder with Node.js/Go/OpenCV, minimal runtime with copied libraries
 - **Docker Compose**: production-ready with volume binding and environment config
 - **Environment Template**: comprehensive .env.template with all required variables
 - **Security**: non-root user, proper permissions, minimal attack surface
 
-### ✅ Background Processing - MODIFIED
-- **Thumbnail Generation**: creates thumbnails when they don't exist (both recordings/events)
+### ✅ Background Processing - FULLY FUNCTIONAL & UNIFIED
+- **Single Processing Pipeline**: ProcessAllVideos() handles all video types uniformly
+- **Thumbnail Generation**: fully enabled OpenCV processing creates thumbnails when missing
 - **File Deletion Removed**: no more 30-day retention or empty file cleanup
-- **Processing Functions**: processVideo() and processEvent() only generate thumbnails
-- **Hourly Schedule**: background tasks run every hour for thumbnail processing
+- **Smart File Handling**: Skips most recent file in each directory (actively recording)
+- **Hourly Schedule**: background task runs every hour for thumbnail processing
+- **OpenCV Integration**: thumbnails.go fully restored with gocv imports and 500px thumbnail generation
 
 ## Key Files & Functions
 
-### Critical Backend Files
-- **`api/main.go:53-55`**: events endpoints (ACTIVE AND WORKING)
-- **`api/handlers.go:188-275`**: event handlers (eventsHandler, eventVideoHandler, eventThumbnailHandler) 
-- **`api/media.go:187-208`**: processVideo() - recordings processing (thumbnail generation only)
-- **`api/media.go:325-337`**: processEvent() - events processing (thumbnail generation only)
-- **`api/cameras.go`**: Camera struct with RecordingsPath() and EventsPath() methods
+### Critical Backend Files (Refactored Architecture)
+- **`api/main.go`**: main application with internal package imports and unified processing
+- **`api/internal/handlers/handlers.go`**: all HTTP handlers (auth, cameras, recordings, events)
+- **`api/internal/auth/auth.go`**: JWT authentication, htpasswd, middleware
+- **`api/internal/cameras/cameras.go`**: Camera struct, discovery, path methods
+- **`api/internal/media/processing.go`**: ProcessAllVideos() - unified video processing
+- **`api/internal/media/thumbnails.go`**: GenerateThumbnail() - OpenCV thumbnail generation
+- **`api/internal/media/recordings.go`**: recording-specific operations
+- **`api/internal/media/events.go`**: event-specific operations with GetEventPath() for slug handling
 
 ### Critical Frontend Files
-- **`ui/src/components/Dashboard.tsx`**: main interface with selectedType state and 3-control layout
+- **`ui/src/components/Dashboard.tsx`**: responsive interface with clean header and mobile layout
 - **`ui/src/components/TypeSelect.tsx`**: recordings/events selector component
 - **`ui/src/services/cameras.ts`**: getRecordingsByDate() and getEventsByDate() api calls
-- **`ui/src/components/VideoPlayer.tsx`**: mediaType prop for URL generation
-- **`ui/src/components/Thumbnail.tsx`**: mediaType prop for thumbnail URLs
+- **`ui/src/components/VideoPlayer.tsx`**: proper slug handling, key prop, error handling, bottom margin
+- **`ui/src/components/Thumbnail.tsx`**: correct slug construction for events (timestamp-eventtype)
 
 ### Critical Configuration Files
-- **`Dockerfile`**: two-stage build (lines 1-38: builder, 40-73: runtime)
+- **`Dockerfile`**: two-stage build with gocv/opencv:4.12.0 builder, debian runtime
 - **`docker-compose.yml`**: production deployment with volume binding
 - **`.env.template`**: all environment variables documented
 
@@ -147,8 +170,8 @@ GET /cameras/{camera}/recordings/{timestamp}/thumbnail    # get recording thumbn
 ### Events (Complete)
 ```
 GET /cameras/{camera}/events?day=YYYY-MM-DD              # get events for date
-GET /cameras/{camera}/events/{timestamp}/video           # stream event video  
-GET /cameras/{camera}/events/{timestamp}/thumbnail       # get event thumbnail
+GET /cameras/{camera}/events/{slug}/video                # stream event video (slug = timestamp-eventtype)
+GET /cameras/{camera}/events/{slug}/thumbnail            # get event thumbnail (slug = timestamp-eventtype)
 ```
 
 ## Code Patterns to Follow
@@ -352,17 +375,17 @@ cd /opt/tapes && ./tapes
 
 ## Success Criteria for Features
 
-### Current System (All ✅ Complete)
-1. ✅ three controls appear in header: camera, date, type
-2. ✅ type selector switches between "recordings" and "events"
-3. ✅ both modes load appropriate data from correct api endpoints
-4. ✅ video playback works for both recordings and events
-5. ✅ thumbnails generate for both types automatically
-6. ✅ background processing handles both recordings and events
-7. ✅ all lint/typecheck commands pass
-8. ✅ layout remains responsive on mobile devices
-9. ✅ docker deployment ready with two-stage build
-10. ✅ no file deletion - only thumbnail generation
+### Current System (All ✅ Complete & Deployed)
+1. ✅ three controls appear in clean header with proper spacing
+2. ✅ type selector switches between "recordings" and "events"  
+3. ✅ both modes load appropriate data from correct api endpoints with proper slug handling
+4. ✅ video playback works for recordings (H.264), events served correctly (MPEG-4 browser dependent)
+5. ✅ thumbnails generate automatically with full OpenCV functionality restored
+6. ✅ background processing handles both recordings and events uniformly
+7. ✅ mobile responsive design with stacked controls on tablets/phones
+8. ✅ professional UI with proper spacing and clean layout
+9. ✅ docker deployment ready with two-stage build and OpenCV 4.12
+10. ✅ no file deletion - only thumbnail generation for family safety system
 
 ## System Integration
 
