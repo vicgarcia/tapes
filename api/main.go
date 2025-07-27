@@ -15,6 +15,7 @@ import (
 
 	"github.com/vicgarcia/tapes/internal/auth"
 	"github.com/vicgarcia/tapes/internal/handlers"
+	"github.com/vicgarcia/tapes/internal/logger"
 	"github.com/vicgarcia/tapes/internal/media"
 )
 
@@ -68,23 +69,26 @@ func main() {
 
 	// start http server in a goroutine
 	go func() {
-		log.Println("starting http server")
+		logger.Info("starting http server on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http server error %v", err)
+			logger.Error("http server error " + err.Error())
 		}
 	}()
 
 	// start background curration process in a goroutine
 	done := make(chan bool)
 	go func() {
+		logger.Info("starting background video processing")
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		media.ProcessAllVideos()
 		for {
 			select {
 			case <-ticker.C:
+				logger.Debug("running scheduled video processing")
 				media.ProcessAllVideos()
 			case <-done:
+				logger.Info("stopping background video processing")
 				return
 			}
 		}
@@ -92,13 +96,14 @@ func main() {
 
 	// wait for interrupt signal
 	<-stop
-	log.Println("shutting down")
+	logger.Info("shutting down server")
 
 	// stop http server
 	if err := srv.Close(); err != nil {
-		log.Printf("http server error %v", err)
+		logger.Error("http server shutdown error " + err.Error())
 	}
 
 	// stop curation process
 	close(done)
+	logger.Info("server shutdown complete")
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/vicgarcia/tapes/internal/auth"
 	"github.com/vicgarcia/tapes/internal/cameras"
+	"github.com/vicgarcia/tapes/internal/logger"
 	"github.com/vicgarcia/tapes/internal/media"
 )
 
@@ -108,12 +110,16 @@ func RecordingsHandler(writer http.ResponseWriter, request *http.Request) {
 
 	recordings, err := media.GetRecordingsByDay(camera, day)
 	if err != nil {
+		logger.Error(fmt.Sprintf("error querying recordings for camera %s, day %s: %v", cameraName, day, err))
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Debug(fmt.Sprintf("found %d recordings for camera %s, day %s", len(recordings), cameraName, day))
+
 	response, err := json.Marshal(recordings)
 	if err != nil {
+		logger.Error(fmt.Sprintf("failed to marshal recordings json: %v", err))
 		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
 		return
 	}
@@ -183,17 +189,20 @@ func EventsHandler(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	day := request.URL.Query().Get("day")
-	// todo: validate day
+	logger.Debug(fmt.Sprintf("camera path: %s, events path: %s", camera.Path, camera.EventsPath()))
 
 	events, err := media.GetEventsByDay(camera, day)
 	if err != nil {
+		logger.Error(fmt.Sprintf("error querying events for camera %s, day %s: %v", cameraName, day, err))
 		http.Error(writer, "error querying events", http.StatusInternalServerError)
 		return
 	}
 
+	logger.Debug(fmt.Sprintf("found %d events for camera %s, day %s", len(events), cameraName, day))
+
 	response, err := json.Marshal(events)
 	if err != nil {
+		logger.Error(fmt.Sprintf("failed to marshal events json: %v", err))
 		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
 		return
 	}
