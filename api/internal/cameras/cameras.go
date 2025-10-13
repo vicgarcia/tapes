@@ -17,11 +17,6 @@ func (c Camera) RecordingsPath() string {
 	return filepath.Join(c.Path, "recordings")
 }
 
-// EventsPath returns the path to events for this camera
-func (c Camera) EventsPath() string {
-	return filepath.Join(c.Path, "events")
-}
-
 // GetStoragePath returns the base storage path from environment variable
 func GetStoragePath() (string, error) {
 	storagePath := os.Getenv("STORAGE_PATH")
