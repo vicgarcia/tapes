@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/vicgarcia/tapes/internal/env"
 )
 
 var (
@@ -14,7 +16,7 @@ var (
 )
 
 func init() {
-	level := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	level := strings.ToUpper(env.GetWithDefault("LOG_LEVEL", "INFO"))
 	debugEnabled = level == "DEBUG"
 
 	infoLogger = log.New(os.Stdout, "[INFO] ", log.LstdFlags)

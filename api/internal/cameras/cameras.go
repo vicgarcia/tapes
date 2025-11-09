@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/vicgarcia/tapes/internal/env"
 )
 
 // Camera represents a camera with its storage paths
@@ -14,10 +16,7 @@ type Camera struct {
 
 // GetStoragePath returns the base storage path from environment variable
 func GetStoragePath() (string, error) {
-	storagePath := os.Getenv("STORAGE_PATH")
-	if storagePath == "" {
-		return "", fmt.Errorf("missing STORAGE_PATH environment variable")
-	}
+	storagePath := env.GetWithDefault("STORAGE_PATH", "/data/cameras")
 	return storagePath, nil
 }
 
