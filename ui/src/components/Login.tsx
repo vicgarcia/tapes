@@ -40,9 +40,8 @@ export function Login() {
         }
         if (!hasError) {
             auth.login(login, password)
-                // @ts-ignore
-                .catch(err => {
-                    setError(err.response.data.error);
+                .catch(() => {
+                    setError('login failed');
                 });
         }
     };
@@ -68,6 +67,11 @@ export function Login() {
                         // isInvalid={error !== null}
                     />
                 </Form.Group>
+                {error && (
+                    <div className='text-danger mb-3 text-center'>
+                        {error}
+                    </div>
+                )}
                 <div className='text-end'>
                     <Button type='submit' variant='primary' size="sm" className='px-4'>log in</Button>
                 </div>
