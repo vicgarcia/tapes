@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -32,14 +30,16 @@ func AuthHandler(writer http.ResponseWriter, request *http.Request) {
 func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
 
+	username := request.FormValue("username")
+	logger.Info("login attempt", "username", username, "remote_addr", request.RemoteAddr)
+
 	passwd, err := auth.GetPasswd()
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to get password file", "error", err)
 		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
 
-	username := request.FormValue("username")
 	password := request.FormValue("password")
 	if username == "" || password == "" {
 		http.Error(writer, "login failed", http.StatusUnauthorized)
@@ -54,7 +54,7 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 
 	err = auth.SetCookie(writer, username)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to set auth cookie", "error", err)
 		http.Error(writer, "login failed", http.StatusUnauthorized)
 		return
 	}
@@ -66,9 +66,11 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 
 // LogoutHandler clears the auth cookie
 func LogoutHandler(writer http.ResponseWriter, request *http.Request) {
+	logger.Info("logout", "remote_addr", request.RemoteAddr)
+
 	err := auth.DeleteCookie(writer)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to delete auth cookie", "error", err)
 		http.Error(writer, "logout failed", http.StatusUnauthorized)
 	}
 
@@ -79,6 +81,8 @@ func LogoutHandler(writer http.ResponseWriter, request *http.Request) {
 
 // CamerasHandler returns json list of cameras
 func CamerasHandler(writer http.ResponseWriter, request *http.Request) {
+	logger.Info("cameras request", "remote_addr", request.RemoteAddr)
+
 	cameras, err := cameras.GetAll()
 	if err != nil {
 		http.Error(writer, "error querying cameras", http.StatusInternalServerError)
@@ -101,27 +105,27 @@ func RecordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	cameraName := vars["camera"]
 	day := request.URL.Query().Get("day")
 
-	logger.Debug(fmt.Sprintf("RecordingsHandler called for camera=%s, day=%s", cameraName, day))
+	logger.Info("recordings request", "camera", cameraName, "day", day, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
-		logger.Error(fmt.Sprintf("invalid camera %s: %v", cameraName, err))
+		logger.Error("invalid camera", "camera", cameraName, "error", err)
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
 	recordings, err := media.GetRecordingsByDay(camera, day)
 	if err != nil {
-		logger.Error(fmt.Sprintf("error querying recordings for camera %s, day %s: %v", cameraName, day, err))
+		logger.Error("error querying recordings", "camera", cameraName, "day", day, "error", err)
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Debug(fmt.Sprintf("found %d recordings for camera %s, day %s", len(recordings), cameraName, day))
+	logger.Debug("found recordings", "camera", cameraName, "day", day, "count", len(recordings))
 
 	response, err := json.Marshal(recordings)
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to marshal recordings json: %v", err))
+		logger.Error("failed to marshal recordings json", "error", err)
 		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +140,7 @@ func RecordingThumbnailHandler(writer http.ResponseWriter, request *http.Request
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	logger.Debug(fmt.Sprintf("RecordingThumbnailHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
+	logger.Info("thumbnail request", "camera", cameraName, "timestamp", timestamp, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -169,7 +173,7 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	logger.Debug(fmt.Sprintf("RecordingVideoHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
+	logger.Info("video request", "camera", cameraName, "timestamp", timestamp, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {

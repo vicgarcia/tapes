@@ -1,7 +1,6 @@
 package media
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/vicgarcia/tapes/internal/cameras"
 	"github.com/vicgarcia/tapes/internal/env"
+	"github.com/vicgarcia/tapes/internal/logger"
 )
 
 // VideoFile represents any video file in the system with its metadata
@@ -33,7 +33,7 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 		pattern := filepath.Join(camera.Path, "*.mp4")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			log.Printf("error getting recordings for camera %s: %v", camera.Name, err)
+			logger.Error("error getting recordings for camera", "camera", camera.Name, "error", err)
 		} else {
 			sort.Strings(files)
 			// Skip last file, likely to be actively being written to
@@ -60,11 +60,11 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 
 // ProcessAllVideos is the main processing function that handles all video files
 func ProcessAllVideos() {
-	log.Println("Starting video processing for thumbnail generation and cleanup")
+	logger.Info("starting video processing for thumbnail generation and cleanup")
 
 	videos, err := GetAllVideoFiles()
 	if err != nil {
-		log.Printf("error getting video files: %v", err)
+		logger.Error("error getting video files", "error", err)
 		return
 	}
 
@@ -87,8 +87,10 @@ func ProcessAllVideos() {
 		processedCount++
 	}
 
-	log.Printf("Video processing complete: processed %d videos, created %d thumbnails, deleted %d videos",
-		processedCount, createdCount, deletedCount)
+	logger.Info("video processing complete",
+		"processed", processedCount,
+		"created", createdCount,
+		"deleted", deletedCount)
 }
 
 // processVideoFile processes a single video file for thumbnail generation and cleanup
@@ -111,15 +113,20 @@ func processVideoFile(video VideoFile, currentTime time.Time, retentionDays int)
 
 			// Delete video if older than retention period (only if retention is enabled)
 			if retentionDays > 0 && daysAgo > retentionDays {
-				log.Printf("Deleting old video %s/%s (%d days old, retention: %d days)",
-					video.Camera, video.Filename, daysAgo, retentionDays)
+				logger.Info("deleting old video",
+					"camera", video.Camera,
+					"filename", video.Filename,
+					"days_old", daysAgo,
+					"retention", retentionDays)
 				deleteVideoAndThumbnail(video.Path, thumbnailPath)
 				return false, true
 			}
 
 			// Check if video file is empty and delete if so
 			if fileInfo, err := os.Stat(video.Path); err == nil && fileInfo.Size() == 0 {
-				log.Printf("Deleting empty video %s/%s", video.Camera, video.Filename)
+				logger.Info("deleting empty video",
+					"camera", video.Camera,
+					"filename", video.Filename)
 				deleteVideoAndThumbnail(video.Path, thumbnailPath)
 				return false, true
 			}
@@ -131,11 +138,11 @@ func processVideoFile(video VideoFile, currentTime time.Time, retentionDays int)
 		// Generate thumbnail
 		_, err := GenerateThumbnail(video.Path)
 		if err != nil {
-			log.Printf("error generating thumbnail for %s: %v", video.Path, err)
+			logger.Error("error generating thumbnail", "path", video.Path, "error", err)
 			return false, false
 		}
 
-		log.Printf("Created thumbnail: %s", thumbnailPath)
+		logger.Debug("created thumbnail", "path", thumbnailPath)
 		return true, false
 	}
 
@@ -147,12 +154,12 @@ func deleteVideoAndThumbnail(videoPath, thumbnailPath string) {
 	// Delete thumbnail if it exists
 	if FileExists(thumbnailPath) {
 		if err := os.Remove(thumbnailPath); err != nil {
-			log.Printf("error deleting thumbnail %s: %v", thumbnailPath, err)
+			logger.Error("error deleting thumbnail", "path", thumbnailPath, "error", err)
 		}
 	}
 
 	// Delete video file
 	if err := os.Remove(videoPath); err != nil {
-		log.Printf("error deleting video %s: %v", videoPath, err)
+		logger.Error("error deleting video", "path", videoPath, "error", err)
 	}
 }
