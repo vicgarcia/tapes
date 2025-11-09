@@ -4,19 +4,15 @@ import { Camera, Video } from '@app/types';
 export type VideoPlayerProps = {
     camera: Camera
     video: Video
-    mediaType: 'recordings' | 'events'
 }
 
-export function VideoPlayer({camera, video, mediaType}: VideoPlayerProps) {
-    const slug = mediaType === 'events' && video.event_type 
-        ? `${video.timestamp}-${video.event_type}`
-        : video.timestamp;
-    const videoUrl = `/cameras/${camera.name}/${mediaType}/${slug}/video`;
-    
+export function VideoPlayer({camera, video}: VideoPlayerProps) {
+    const videoUrl = `/cameras/${camera.name}/recordings/${video.timestamp}/video`;
+
     return <div className='video-player mb-5'>
-        <ReactPlayer 
-            key={`${camera.name}-${mediaType}-${slug}`}
-            width='100%' 
+        <ReactPlayer
+            key={`${camera.name}-${video.timestamp}`}
+            width='100%'
             height='100%'
             url={videoUrl}
             controls={true}

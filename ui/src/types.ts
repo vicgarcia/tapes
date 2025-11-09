@@ -4,5 +4,4 @@ export type Camera = {
 
 export type Video = {
     timestamp: string
-    event_type?: string
 }

@@ -8,17 +8,13 @@ export type ThumbnailProps = {
     camera: Camera
     video: Video
     setActive: Function
-    mediaType: 'recordings' | 'events'
 }
 
-export function Thumbnail({camera, video, setActive, mediaType}: ThumbnailProps) {
+export function Thumbnail({camera, video, setActive}: ThumbnailProps) {
     const [img, setImg] = useState<any|null>(null);
 
     useEffect(() => {
-        const slug = mediaType === 'events' && video.event_type 
-            ? `${video.timestamp}-${video.event_type}`
-            : video.timestamp;
-        getThumbnail(camera.name, slug, mediaType)
+        getThumbnail(camera.name, video.timestamp)
             .then(response => setImg(URL.createObjectURL(response.data)))
     }, []);
 

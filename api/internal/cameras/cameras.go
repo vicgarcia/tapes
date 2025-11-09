@@ -12,11 +12,6 @@ type Camera struct {
 	Name string `json:"name"`
 }
 
-// RecordingsPath returns the path to recordings for this camera
-func (c Camera) RecordingsPath() string {
-	return filepath.Join(c.Path, "recordings")
-}
-
 // GetStoragePath returns the base storage path from environment variable
 func GetStoragePath() (string, error) {
 	storagePath := os.Getenv("STORAGE_PATH")

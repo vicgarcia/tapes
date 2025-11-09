@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import { Container, Row, Col, Button } from "react-bootstrap";
 import dayjs from 'dayjs';
 import { Camera, Video } from '@app/types';
-import { getRecordingsByDate, getEventsByDate } from '@app/services/cameras';
+import { getRecordingsByDate } from '@app/services/cameras';
 import { CameraSelect } from './CameraSelect';
 import { DateSelect } from './DateSelect';
-import { TypeSelect, MediaType } from './TypeSelect';
 import { Thumbnail } from './Thumbnail';
 import { VideoPlayer } from './VideoPlayer';
 
@@ -18,16 +17,15 @@ export function Dashboard() {
 
     useEffect(() => {
         if (selectedCamera !== null && selectedDate !== null) {
-            const getMedia = selectedType === 'recordings' 
-                ? getRecordingsByDate 
-                : getEventsByDate;
-                
-            getMedia(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
+            getRecordingsByDate(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
                 .then(response => setVideos(response));
         }
-    }, [selectedCamera, selectedDate, selectedType])
+    }, [selectedCamera, selectedDate])
+
 
     return <Container>
+
+      {/* Header */}
       <Row className='pt-4 pb-3'>
         
         {/* Desktop Layout */}
@@ -50,16 +48,10 @@ export function Dashboard() {
                   setSelected={setSelectedCamera}
                 />
               </div>
-              <div style={{minWidth: '200px'}}>
-                <TypeSelect
-                  selected={selectedType}
-                  setSelected={setSelectedType}
-                />
-              </div>
             </> : <>
-              <Button 
+              <Button
                 variant='outline-secondary'
-                onClick={_ => setActive(null)}
+                onClick={handleBackClick}
                 style={{minWidth: '120px', padding: '8px 16px'}}
               >
                 ← Back
@@ -80,10 +72,6 @@ export function Dashboard() {
                 selected={selectedCamera}
                 setSelected={setSelectedCamera}
               />
-              <TypeSelect
-                selected={selectedType}
-                setSelected={setSelectedType}
-              />
             </div>
           ) : (
             <div className='text-center'>
@@ -101,6 +89,7 @@ export function Dashboard() {
 
       </Row>
 
+      {/* Content */}
       <Row className='pt-4'>
         <Col xs={12}>
           {active !== null ? (
@@ -108,7 +97,6 @@ export function Dashboard() {
               <VideoPlayer
                 camera={selectedCamera!}
                 video={active}
-                mediaType={selectedType}
               />
             </div>
           ) : (
@@ -118,8 +106,7 @@ export function Dashboard() {
                   key={`${selectedCamera!.name}-${v.timestamp}`}
                   camera={selectedCamera!}
                   video={v}
-                  setActive={setActive}
-                  mediaType={selectedType}
+                  setActive={handleVideoClick}
                 />
               )}
             </Row>

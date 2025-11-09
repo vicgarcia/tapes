@@ -55,9 +55,6 @@ func main() {
 	r.HandleFunc("/cameras/{camera}/recordings", auth.ValidateAuth(handlers.RecordingsHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", auth.ValidateAuth(handlers.RecordingVideoHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", auth.ValidateAuth(handlers.RecordingThumbnailHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events", auth.ValidateAuth(handlers.EventsHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/video", auth.ValidateAuth(handlers.EventVideoHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", auth.ValidateAuth(handlers.EventThumbnailHandler)).Methods("GET")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 

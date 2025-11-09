@@ -12,10 +12,9 @@ import (
 
 // VideoFile represents any video file in the system with its metadata
 type VideoFile struct {
-	Path      string
-	Directory string 	// "recordings"
-	Camera    string
-	Filename  string
+	Path     string
+	Camera   string
+	Filename string
 }
 
 // GetAllVideoFiles discovers all video files across all cameras and directories
@@ -28,8 +27,8 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 	var allVideos []VideoFile
 
 	for _, camera := range cameras {
-		// Get videos from recordings directory
-		pattern := filepath.Join(camera.RecordingsPath(), "*.mp4")
+		// Get videos from camera directory
+		pattern := filepath.Join(camera.Path, "*.mp4")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Printf("error getting recordings for camera %s: %v", camera.Name, err)
@@ -41,10 +40,9 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 			}
 			for _, file := range files {
 				allVideos = append(allVideos, VideoFile{
-					Path:      file,
-					Directory: "recordings",
-					Camera:    camera.Name,
-					Filename:  filepath.Base(file),
+					Path:     file,
+					Camera:   camera.Name,
+					Filename: filepath.Base(file),
 				})
 			}
 		}
