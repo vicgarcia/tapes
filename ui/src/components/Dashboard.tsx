@@ -11,9 +11,9 @@ import { VideoPlayer } from './VideoPlayer';
 export function Dashboard() {
     const [selectedDate, setSelectedDate] = useState<Date|null>(null);
     const [selectedCamera, setSelectedCamera] = useState<Camera|null>(null);
-    const [selectedType, setSelectedType] = useState<MediaType>('recordings');
     const [videos, setVideos] = useState<Array<Video>>([]);
     const [active, setActive] = useState<Video|null>(null);
+    const [scrollToTimestamp, setScrollToTimestamp] = useState<string|null>(null);
 
     useEffect(() => {
         if (selectedCamera !== null && selectedDate !== null) {
@@ -22,6 +22,27 @@ export function Dashboard() {
         }
     }, [selectedCamera, selectedDate])
 
+    // Scroll to timestamp when returning to list view
+    useEffect(() => {
+        if (active === null && scrollToTimestamp !== null) {
+            // Delay to allow thumbnails to render first
+            setTimeout(() => {
+                const element = document.getElementById(`video-${scrollToTimestamp}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
+        }
+    }, [active, scrollToTimestamp])
+
+    const handleVideoClick = (video: Video) => {
+        setScrollToTimestamp(video.timestamp);
+        setActive(video);
+    }
+
+    const handleBackClick = () => {
+        setActive(null);
+    }
 
     return <Container>
 
@@ -75,9 +96,9 @@ export function Dashboard() {
             </div>
           ) : (
             <div className='text-center'>
-              <Button 
+              <Button
                 variant='outline-secondary'
-                onClick={_ => setActive(null)}
+                onClick={handleBackClick}
                 className='w-100'
                 style={{padding: '12px'}}
               >

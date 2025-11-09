@@ -20,6 +20,7 @@ export function Thumbnail({camera, video, setActive}: ThumbnailProps) {
 
     return img !== null ? <>
         <Col xs={4} className='thumbnail mb-3'
+            id={`video-${video.timestamp}`}
             onClick={_ => setActive(video)}
         >
             <img src={img} className='thumbnail' />
