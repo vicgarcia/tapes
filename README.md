@@ -6,13 +6,15 @@ tapes is the result of that journey. It's built around a straightforward idea: u
 
 This isn't trying to be a complete commercial NVR replacement with every feature imaginable. Instead, it's a solid foundation that handles the core job well—continuous recording with a clean web interface—and stays out of your way when you want to build on top of it. The system has been running in production for months, quietly doing its job while I've refined the pieces that matter.
 
+Recent improvements have simplified the architecture significantly: MediaMTX now handles recording natively using crash-resilient fragmented MP4 files, automatic retention management keeps disk usage in check, and structured logging makes debugging straightforward. The result is a cleaner, more reliable system that just works.
+
 ## Overview
 
 tapes is built on three core components that work together:
 
-- **MediaMTX**: Proxies your IP camera RTSP streams and manages FFmpeg processes to capture continuous recordings
+- **MediaMTX**: Proxies your IP camera RTSP streams and handles native continuous recording (no FFmpeg needed)
 - **tapes web application**: Go backend with React frontend for browsing and viewing recordings
-- **Storage**: Simple file-based storage with automatic thumbnail generation
+- **Storage**: Simple file-based storage with automatic thumbnail generation and retention management
 
 Everything runs in Docker containers orchestrated by docker-compose for easy deployment and management.
 
@@ -33,7 +35,7 @@ Before you begin, you'll need:
 Create the directory structure for your camera recordings:
 
 ```bash
-sudo mkdir -p /data/cameras/{garage,kitchen,study}/recordings
+sudo mkdir -p /data/cameras/{garage,kitchen,study}
 sudo chmod -R 755 /data/cameras
 ```
 
@@ -41,13 +43,12 @@ Replace `garage`, `kitchen`, and `study` with your actual camera names. The stru
 
 ```
 /data/cameras/
-├── garage/
-│   └── recordings/     # Continuous 15-minute segments
+├── garage/             # Video files go directly here
 ├── kitchen/
-│   └── recordings/
 └── study/
-    └── recordings/
 ```
+
+MediaMTX will create video files directly in each camera directory—no subdirectories needed.
 
 ### 2. Clone the Repository
 
@@ -68,11 +69,18 @@ nano .env
 Edit the `.env` file with your settings:
 
 ```bash
-JWT_KEY=your-secret-key-here          # Required: JWT signing key
-CAMERAS_DIR=/data/cameras              # Path to camera recordings
-HTPASSWD_FILE=/app/passwords           # Path to htpasswd file in container
-PORT=8080                              # Web server port
+# Required
+JWT_KEY=your-secret-key-here              # Generate with: openssl rand -hex 32
+
+# Optional (defaults shown)
+STORAGE_PATH=/data/cameras                # Path to camera recordings
+PASSWORDS_PATH=/opt/tapes/passwords       # Path to htpasswd file
+JWT_ISSUER=tapes                          # JWT issuer identifier
+DEBUG=false                               # Enable debug logging (true/false)
+RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep forever)
 ```
+
+**Important**: Generate a secure JWT_KEY with `openssl rand -hex 32` - don't use a simple password.
 
 ### 4. Create Authentication File
 
@@ -91,22 +99,23 @@ Edit the MediaMTX configuration at `mediamtx.yml`:
 paths:
   garage:
     source: rtsp://user:password@192.168.1.101:554/live/ch0
-    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/garage -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/garage/recordings/%Y%m%d%H%M%S.mp4
-    runOnReadyRestart: yes
-  
+    sourceProtocol: tcp
+
   kitchen:
     source: rtsp://user:password@192.168.1.102:554/live/ch0
-    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/kitchen -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/kitchen/recordings/%Y%m%d%H%M%S.mp4
-    runOnReadyRestart: yes
+    sourceProtocol: tcp
 ```
 
-Key configuration details:
+That's it! MediaMTX handles recording automatically using the global defaults already configured in `mediamtx.yml`:
 
-- **source**: Your camera's RTSP stream URL
-- **runOnReady**: FFmpeg command that captures the proxied stream
-- **segment_time 900**: Creates 15-minute video files (900 seconds)
-- **segment_atclocktime 1**: Aligns segments to clock time
-- **Filename format**: `YYYYMMDDHHMMSS.mp4` (e.g., `20250720143000.mp4`)
+- **Native recording**: Built-in recording (no FFmpeg needed)
+- **Format**: Fragmented MP4 (fmp4) - resilient to crashes
+- **Segment duration**: 5-minute video files
+- **Part duration**: 1-second disk flush (max 1s data loss on crash)
+- **Retention**: Auto-delete after 90 days (configurable)
+- **Filename format**: `YYYYMMDDHHMMSS.mp4` (e.g., `20251109143000.mp4`)
+
+Simply add your camera's RTSP URL and MediaMTX handles the rest.
 
 ### 6. Start the System
 
@@ -123,20 +132,20 @@ docker-compose ps
 docker-compose logs
 ```
 
-The web application will be available at `http://your-server:8080`.
+The web application will be available at `http://your-server:8671`.
 
-Verify recordings are being created by checking for video files in `/data/cameras/{camera}/recordings/`.
+Verify recordings are being created by checking for video files in `/data/cameras/{camera}/`.
 
 ## Using tapes
 
-Once running, open `http://your-server:8080` in your browser:
+Once running, open `http://your-server:8671` in your browser:
 
 1. **Login** with credentials from your htpasswd file
 2. **Select Camera** from the dropdown
 3. **Choose Date** to browse recordings
 4. **Click thumbnails** to play videos
 
-The interface automatically generates thumbnails for all videos hourly. Recordings are played as native H.264 video in your browser.
+The interface automatically generates thumbnails for all videos hourly. Recordings are played as native H.264 video in your browser. Videos are stored in 5-minute segments, making it easy to find exactly what you need.
 
 ## Production Deployment
 
@@ -148,12 +157,19 @@ Monitor disk usage regularly:
 df -h /data/cameras
 ```
 
-With 15-minute segments, storage usage depends on your bitrate. Typical cameras at 2-4 Mbps use roughly:
+With 5-minute segments, storage usage depends on your bitrate. Typical cameras at 2-4 Mbps use roughly:
 
 - **Per camera**: 1-2 GB per day, 30-60 GB per month
 - **Three cameras**: 3-6 GB per day, 90-180 GB per month
 
-Implement automatic cleanup if needed (not included by default).
+By default, tapes automatically deletes recordings older than 90 days. You can adjust this in `.env`:
+
+```bash
+RETENTION_DAYS=90    # Auto-delete after 90 days
+RETENTION_DAYS=0     # Keep forever (disable auto-deletion)
+```
+
+Note that MediaMTX also has its own retention setting in `mediamtx.yml` (`recordDeleteAfter`). Both can run independently—set them to match for consistency.
 
 ### Reverse Proxy
 
@@ -168,7 +184,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
 
     location / {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8671;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
@@ -179,18 +195,25 @@ server {
 
 ### No video files appearing
 
-Check MediaMTX container is running:
+Check MediaMTX container is running and recording:
 
 ```bash
 docker-compose ps
 docker-compose logs mediamtx
 ```
 
-Verify camera URLs are correct and accessible from your server.
+Verify camera URLs are correct and accessible from your server. Check that recordings are being created in `/data/cameras/{camera}/`.
 
 ### Thumbnails not generating
 
-Check disk space and verify tapes has write permissions to camera directories. Thumbnails generate hourly automatically.
+Check disk space and verify tapes has write permissions to camera directories. Thumbnails generate hourly automatically. Enable debug logging to see detailed thumbnail generation:
+
+```bash
+# In .env file
+DEBUG=true
+```
+
+Then check logs: `docker-compose logs tapes`
 
 ### Can't login to web interface
 
@@ -200,7 +223,17 @@ Verify htpasswd file exists and contains users:
 cat passwords
 ```
 
-Check JWT_KEY is set in `.env` file.
+Check JWT_KEY is set in `.env` file and is a secure random key (not a simple password).
+
+### Enable debug logging
+
+For detailed diagnostics, enable debug mode in `.env`:
+
+```bash
+DEBUG=true
+```
+
+This shows all request details, thumbnail generation, and processing information in the logs.
 
 ## Architecture Details
 
@@ -226,7 +259,10 @@ tapes runs an hourly background task that:
 - Scans all camera directories for video files
 - Generates thumbnails for any videos missing them using OpenCV
 - Skips the most recent file (may still be recording)
-- Preserves all video files indefinitely
+- Deletes videos older than RETENTION_DAYS (default: 90 days)
+- Removes zero-byte files (corrupted recordings)
+
+All processing is logged with structured output for easy monitoring.
 
 ## Contributing
 
