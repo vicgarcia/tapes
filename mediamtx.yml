@@ -1,0 +1,87 @@
+# MediaMTX config
+
+# Log level: debug, info, warn, error
+logLevel: info
+# Log destinations: stdout, file, syslog
+logDestinations: [stdout]
+
+# Enable Control API for monitoring
+api: yes
+apiAddress: 127.0.0.1:9997
+
+# Connection timeouts
+readTimeout: 10s
+writeTimeout: 10s
+readBufferCount: 512
+
+# RTSP Configuration
+
+# Enable RTSP
+rtsp: yes
+# Supported transports (TCP recommended for reliability)
+protocols: [tcp, udp]
+# RTSP listener address
+rtspAddress: :8554
+# No encryption (can enable with rtsps if needed)
+encryption: "no"
+# Authentication methods
+authMethods: [basic]
+
+# Disable Unnecessary Protocols
+
+# Disable RTMP
+rtmp: no
+
+# Disable HLS
+hls: no
+
+# Disable WebRTC
+webrtc: no
+
+# Disable SRT
+srt: no
+
+# Recording Configuration (Built-in)
+
+pathDefaults:
+  # Enable recording for all paths by default
+  record: yes
+
+  # Recording path pattern
+  # %path = camera name (garage, kitchen, study)
+  # Result: /data/cameras/garage/20251108143000.mp4
+  recordPath: /data/cameras/%path/%Y%m%d%H%M%S
+
+  # Recording format: fmp4 (fragmented MP4)
+  # Better crash resilience than mpegts, MP4 compatible
+  recordFormat: fmp4
+
+  # Part duration - data flushed to disk every 1 second
+  # If system crashes, max 1 second of data lost (RPO)
+  recordPartDuration: 1s
+
+  # Segment duration - create new file every 5 minutes
+  # Matches your 300-second (5-minute) recording segments
+  recordSegmentDuration: 5m
+
+  # Delete segments older than 90 days
+  # Set to 0 to keep forever, or adjust based on storage
+  recordDeleteAfter: 90d
+
+  # Use TCP by default for camera connections (more reliable)
+  sourceProtocol: tcp
+
+# Camera Configuration
+
+paths:
+
+  # Kitchen camera
+  kitchen:
+    source: rtsp://admin:123456@192.168.144.114:554/live/ch0
+    sourceProtocol: tcp
+
+  # Add additional cameras here following the same pattern:
+
+  # garage:
+  #   source: rtsp://admin:password@192.168.x.x:554/stream
+  #   sourceProtocol: tcp
