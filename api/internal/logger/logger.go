@@ -1,6 +1,9 @@
 package logger
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -9,6 +12,58 @@ import (
 )
 
 var log *slog.Logger
+
+// customHandler formats logs similar to mediamtx: timestamp level message key=value...
+type customHandler struct {
+	w     io.Writer
+	level slog.Level
+}
+
+func (h *customHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= h.level
+}
+
+func (h *customHandler) Handle(_ context.Context, r slog.Record) error {
+	// format timestamp like mediamtx: 2025/11/11 03:59:26
+	timestamp := r.Time.Format("2006/01/02 15:04:05")
+
+	// format level as uppercase 3-letter abbreviation
+	var levelStr string
+	switch r.Level {
+	case slog.LevelDebug:
+		levelStr = "DBG"
+	case slog.LevelInfo:
+		levelStr = "INF"
+	case slog.LevelWarn:
+		levelStr = "WRN"
+	case slog.LevelError:
+		levelStr = "ERR"
+	default:
+		levelStr = "INF"
+	}
+
+	// build log line: timestamp level message key=value...
+	buf := fmt.Sprintf("%s %s %s", timestamp, levelStr, r.Message)
+
+	// append structured attributes as key=value pairs
+	r.Attrs(func(a slog.Attr) bool {
+		buf += fmt.Sprintf(" %s=%v", a.Key, a.Value)
+		return true
+	})
+
+	buf += "\n"
+
+	_, err := h.w.Write([]byte(buf))
+	return err
+}
+
+func (h *customHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *customHandler) WithGroup(name string) slog.Handler {
+	return h
+}
 
 func init() {
 	// check if debug mode is enabled via DEBUG env var
@@ -21,20 +76,12 @@ func init() {
 		level = slog.LevelDebug
 	}
 
-	// create text handler with lowercase output to stdout
-	opts := &slog.HandlerOptions{
-		Level: level,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			// lowercase the level key
-			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
-				a.Value = slog.StringValue(strings.ToLower(level.String()))
-			}
-			return a
-		},
+	// create custom handler
+	handler := &customHandler{
+		w:     os.Stdout,
+		level: level,
 	}
 
-	handler := slog.NewTextHandler(os.Stdout, opts)
 	log = slog.New(handler)
 
 	// set as default logger for any code using slog directly
