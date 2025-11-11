@@ -1,7 +1,8 @@
 # MediaMTX config
 
 # Log level: debug, info, warn, error
-logLevel: info
+# Set to warn to reduce RTP packet loss noise (expected with IP cameras)
+logLevel: warn
 # Log destinations: stdout, file, syslog
 logDestinations: [stdout]
 
@@ -12,7 +13,9 @@ apiAddress: 127.0.0.1:9997
 # Connection timeouts
 readTimeout: 10s
 writeTimeout: 10s
-readBufferCount: 512
+
+# Increase buffer to handle packet loss better
+writeQueueSize: 2048
 
 # RTSP Configuration
 
@@ -32,8 +35,18 @@ authMethods: [basic]
 # Disable RTMP
 rtmp: no
 
-# Disable HLS
-hls: no
+# Enable HLS for live streaming
+hls: yes
+hlsAddress: :8888
+# Always remux - ensures streams are available even if no one is watching
+hlsAlwaysRemux: yes
+# Stable HLS settings - increase segment duration and count for more buffering
+hlsSegmentDuration: 3s
+hlsSegmentCount: 10
+# Disable Low-Latency HLS to avoid part duration issues
+hlsPartDuration: 0s
+# Increased variant to handle packet loss better
+hlsVariant: mpegts
 
 # Disable WebRTC
 webrtc: no

@@ -1,133 +1,203 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, CSSProperties } from 'react'
 import { Container, Row, Col, Button } from "react-bootstrap";
 import dayjs from 'dayjs';
-import { Camera, Video } from '@app/types';
+import { Camera, Recording } from '@app/types';
 import { getRecordingsByDate } from '@app/services/cameras';
 import { CameraSelect } from './CameraSelect';
 import { DateSelect } from './DateSelect';
 import { Thumbnail } from './Thumbnail';
-import { VideoPlayer } from './VideoPlayer';
+import { RecordingPlayer } from './RecordingPlayer';
+import { LivePlayer } from './LivePlayer';
+
+type ActiveView = Recording | Camera | null;
+
+const styles = {
+    controls: {
+        gap: '1rem'
+    } as CSSProperties,
+
+    buttonDesktop: {
+        minWidth: '120px',
+        padding: '8px 16px',
+        textTransform: 'uppercase'
+    } as CSSProperties,
+
+    buttonMobileFull: {
+        padding: '12px',
+        textTransform: 'uppercase'
+    } as CSSProperties,
+
+    buttonMobileCompact: {
+        minWidth: '100px',
+        padding: '12px',
+        textTransform: 'uppercase'
+    } as CSSProperties,
+
+    selectWrapper: {
+        minWidth: '200px'
+    } as CSSProperties,
+
+    selectWrapperFlex: {
+        flex: 1
+    } as CSSProperties
+};
 
 export function Dashboard() {
     const [selectedDate, setSelectedDate] = useState<Date|null>(null);
     const [selectedCamera, setSelectedCamera] = useState<Camera|null>(null);
-    const [videos, setVideos] = useState<Array<Video>>([]);
-    const [active, setActive] = useState<Video|null>(null);
+    const [recordings, setRecordings] = useState<Array<Recording>>([]);
+    const [active, setActive] = useState<ActiveView>(null);
     const [scrollToTimestamp, setScrollToTimestamp] = useState<string|null>(null);
 
     useEffect(() => {
         if (selectedCamera !== null && selectedDate !== null) {
             getRecordingsByDate(selectedCamera.name, dayjs(selectedDate).format('YYYY-MM-DD'))
-                .then(response => setVideos(response));
+                .then(response => setRecordings(response));
         }
     }, [selectedCamera, selectedDate])
 
     // Scroll to timestamp when returning to list view
     useEffect(() => {
         if (active === null && scrollToTimestamp !== null) {
-            // Delay to allow thumbnails to render first
-            setTimeout(() => {
-                const element = document.getElementById(`video-${scrollToTimestamp}`);
+            requestAnimationFrame(() => {
+                const element = document.getElementById(`recording-${scrollToTimestamp}`);
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
-            }, 100);
+            });
         }
     }, [active, scrollToTimestamp])
 
-    const handleVideoClick = (video: Video) => {
-        setScrollToTimestamp(video.timestamp);
-        setActive(video);
+    const handleRecordingClick = (recording: Recording) => {
+        setScrollToTimestamp(recording.timestamp);
+        setActive(recording);
     }
 
     const handleBackClick = () => {
         setActive(null);
     }
 
-    return <Container>
+    const handleLiveClick = () => {
+        if (selectedCamera) {
+            setActive(selectedCamera);
+        }
+    }
 
-      {/* Header */}
+    // check if active is a Camera (for live view)
+    const isLiveView = active !== null && 'name' in active && !('timestamp' in active);
+
+    // check if active is a Recording (for recording view)
+    const isRecordingView = active !== null && 'timestamp' in active;
+
+    return <Container>
+      {/* header */}
       <Row className='pt-4 pb-3'>
-        
-        {/* Desktop Layout */}
+
+        {/* desktop layout */}
         <Col className='d-none d-md-flex align-items-center justify-content-between'>
-          {/* Empty space on left */}
+          {/* empty space on left */}
           <div></div>
 
-          {/* Controls - Right Side */}
-          <div className='d-flex align-items-center' style={{gap: '1rem'}}>
-            {active == null ? <>
-              <div style={{minWidth: '200px'}}>
-                <DateSelect
-                  selected={selectedDate}
-                  setSelected={setSelectedDate}
-                />
-              </div>
-              <div style={{minWidth: '200px'}}>
-                <CameraSelect
-                  selected={selectedCamera}
-                  setSelected={setSelectedCamera}
-                />
-              </div>
-            </> : <>
+          {/* controls - right side */}
+          <div className='d-flex align-items-center' style={styles.controls}>
+            {active !== null ? (
               <Button
                 variant='outline-secondary'
                 onClick={handleBackClick}
-                style={{minWidth: '120px', padding: '8px 16px'}}
+                style={styles.buttonDesktop}
               >
-                ← Back
+                Back
               </Button>
-            </>}
+            ) : (
+              <>
+                <Button
+                  variant='outline-secondary'
+                  onClick={handleLiveClick}
+                  disabled={selectedCamera === null}
+                  style={styles.buttonDesktop}
+                >
+                  Live
+                </Button>
+                <div style={styles.selectWrapper}>
+                  <DateSelect
+                    selected={selectedDate}
+                    setSelected={setSelectedDate}
+                  />
+                </div>
+                <div style={styles.selectWrapper}>
+                  <CameraSelect
+                    selected={selectedCamera}
+                    setSelected={setSelectedCamera}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </Col>
 
-        {/* Mobile Layout */}
+        {/* mobile layout */}
         <Col className='d-md-none'>
-          {active == null ? (
-            <div className='d-flex flex-column gap-3'>
-              <DateSelect
-                selected={selectedDate}
-                setSelected={setSelectedDate}
-              />
-              <CameraSelect
-                selected={selectedCamera}
-                setSelected={setSelectedCamera}
-              />
-            </div>
-          ) : (
+          {active !== null ? (
             <div className='text-center'>
               <Button
                 variant='outline-secondary'
                 onClick={handleBackClick}
                 className='w-100'
-                style={{padding: '12px'}}
+                style={styles.buttonMobileFull}
               >
-                ← Back
+                Back
               </Button>
+            </div>
+          ) : (
+            <div className='d-flex flex-column gap-3'>
+              <div className='d-flex gap-2'>
+                <Button
+                  variant='outline-secondary'
+                  onClick={handleLiveClick}
+                  disabled={selectedCamera === null}
+                  style={styles.buttonMobileCompact}
+                >
+                  Live
+                </Button>
+                <div style={styles.selectWrapperFlex}>
+                  <DateSelect
+                    selected={selectedDate}
+                    setSelected={setSelectedDate}
+                  />
+                </div>
+              </div>
+              <CameraSelect
+                selected={selectedCamera}
+                setSelected={setSelectedCamera}
+              />
             </div>
           )}
         </Col>
 
       </Row>
 
-      {/* Content */}
+      {/* content */}
       <Row className='pt-4'>
         <Col xs={12}>
-          {active !== null ? (
+          {isLiveView ? (
             <div className='d-flex justify-content-center'>
-              <VideoPlayer
+              <LivePlayer camera={active as Camera} />
+            </div>
+          ) : isRecordingView ? (
+            <div className='d-flex justify-content-center'>
+              <RecordingPlayer
                 camera={selectedCamera!}
-                video={active}
+                recording={active as Recording}
               />
             </div>
           ) : (
             <Row className='g-3'>
-              {videos && videos.map(v =>
+              {recordings && recordings.map(r =>
                 <Thumbnail
-                  key={`${selectedCamera!.name}-${v.timestamp}`}
+                  key={`${selectedCamera!.name}-${r.timestamp}`}
                   camera={selectedCamera!}
-                  video={v}
-                  setActive={handleVideoClick}
+                  recording={r}
+                  setActive={handleRecordingClick}
                 />
               )}
             </Row>

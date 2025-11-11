@@ -7,8 +7,7 @@ services:
     environment:
       - TZ=${TZ:-UTC}
     ports:
-      - "8554:8554"  # RTSP
-      - "9997:9997"  # API (optional, for monitoring)
+      - "8554:8554"  # RTSP Local Proxy
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
       - ./data/cameras:/data/cameras

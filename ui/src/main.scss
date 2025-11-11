@@ -28,6 +28,13 @@
     }
 }
 
+.btn-outline-secondary:active,
+.btn-outline-secondary:focus {
+    background-color: transparent !important;
+    border-color: var(--bs-secondary) !important;
+    color: var(--bs-body-color) !important;
+}
+
 .form-select, .form-select:focus {
     border-color: var(--bs-btn-active-color)
 }

@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -187,4 +190,79 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	http.ServeFile(writer, request, recordingPath)
+}
+
+// LiveStreamHandler proxies hls live stream requests to mediamtx
+func LiveStreamHandler(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	cameraName := vars["camera"]
+	pathSuffix := strings.TrimPrefix(request.URL.Path, fmt.Sprintf("/cameras/%s/live/", cameraName))
+
+	// log playlist requests at info level, segments at debug level
+	if strings.HasSuffix(pathSuffix, ".m3u8") {
+		logger.Info("live stream request", "camera", cameraName, "path", pathSuffix, "remote_addr", request.RemoteAddr)
+	} else {
+		logger.Debug("live stream segment", "camera", cameraName, "path", pathSuffix, "remote_addr", request.RemoteAddr)
+	}
+
+	camera, err := cameras.GetByName(cameraName)
+	if err != nil {
+		logger.Error("invalid camera", "camera", cameraName, "error", err)
+		http.Error(writer, "invalid camera", http.StatusBadRequest)
+		return
+	}
+
+	// construct mediamtx url and create proxy request
+	mediamtxURL := fmt.Sprintf("http://mediamtx:8888/%s/%s", camera.Name, pathSuffix)
+	logger.Debug("proxying to mediamtx", "url", mediamtxURL)
+
+	proxyReq, err := http.NewRequest("GET", mediamtxURL, nil)
+	if err != nil {
+		logger.Error("failed to create proxy request", "error", err)
+		http.Error(writer, "proxy error", http.StatusInternalServerError)
+		return
+	}
+
+	proxyReq.Header.Set("User-Agent", request.Header.Get("User-Agent"))
+
+	// execute proxy request to mediamtx
+	client := &http.Client{}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		logger.Error("proxy request failed", "url", mediamtxURL, "error", err)
+		http.Error(writer, "stream unavailable", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Error("mediamtx returned error", "status", resp.StatusCode, "url", mediamtxURL)
+		http.Error(writer, "stream unavailable", resp.StatusCode)
+		return
+	}
+
+	// copy mediamtx response headers
+	for key, values := range resp.Header {
+		for _, value := range values {
+			writer.Header().Add(key, value)
+		}
+	}
+
+	// set content type and cors headers
+	if strings.HasSuffix(pathSuffix, ".m3u8") {
+		writer.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	} else if strings.HasSuffix(pathSuffix, ".ts") {
+		writer.Header().Set("Content-Type", "video/mp2t")
+	}
+
+	writer.Header().Set("Access-Control-Allow-Origin", "*")
+	writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// stream response to client
+	writer.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(writer, resp.Body)
+	if err != nil {
+		logger.Error("failed to copy response body", "error", err)
+	}
 }
