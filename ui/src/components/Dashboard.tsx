@@ -59,12 +59,20 @@ export function Dashboard() {
     // Scroll to timestamp when returning to list view
     useEffect(() => {
         if (active === null && scrollToTimestamp !== null) {
-            requestAnimationFrame(() => {
+            let attempts = 0;
+            const maxAttempts = 30; // 3 seconds max (30 * 100ms)
+
+            const tryScroll = () => {
                 const element = document.getElementById(`recording-${scrollToTimestamp}`);
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else if (attempts < maxAttempts) {
+                    attempts++;
+                    setTimeout(tryScroll, 100);
                 }
-            });
+            };
+
+            tryScroll();
         }
     }, [active, scrollToTimestamp])
 
