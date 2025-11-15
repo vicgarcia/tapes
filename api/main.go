@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,9 +26,6 @@ var static embed.FS
 // web server
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.SetOutput(os.Stdout)
-
 	// load .env file from the same path as the executable
 	// log.Println("loading environment config")
 	// err := godotenv.Load(".env")
@@ -55,9 +51,7 @@ func main() {
 	r.HandleFunc("/cameras/{camera}/recordings", auth.ValidateAuth(handlers.RecordingsHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/video", auth.ValidateAuth(handlers.RecordingVideoHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}/recordings/{timestamp}/thumbnail", auth.ValidateAuth(handlers.RecordingThumbnailHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events", auth.ValidateAuth(handlers.EventsHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/video", auth.ValidateAuth(handlers.EventVideoHandler)).Methods("GET")
-	r.HandleFunc("/cameras/{camera}/events/{slug}/thumbnail", auth.ValidateAuth(handlers.EventThumbnailHandler)).Methods("GET")
+	r.PathPrefix("/cameras/{camera}/live/").HandlerFunc(auth.ValidateAuth(handlers.LiveStreamHandler)).Methods("GET")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(staticFS)))
 
@@ -69,9 +63,9 @@ func main() {
 
 	// start http server in a goroutine
 	go func() {
-		logger.Info("starting http server on :8671")
+		logger.Info("starting http server", "port", 8671)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("http server error " + err.Error())
+			logger.Error("http server error", "error", err)
 		}
 	}()
 
@@ -100,7 +94,7 @@ func main() {
 
 	// stop http server
 	if err := srv.Close(); err != nil {
-		logger.Error("http server shutdown error " + err.Error())
+		logger.Error("http server shutdown error", "error", err)
 	}
 
 	// stop curation process

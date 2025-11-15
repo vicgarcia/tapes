@@ -1,12 +1,24 @@
 services:
 
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: mediamtx
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    ports:
+      - "8554:8554"  # RTSP Local Proxy
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - ./data/cameras:/data/cameras
+
   tapes:
     build: .
     image: tapes:latest
+    container_name: tapes
     restart: unless-stopped
     environment:
-      - STORAGE_PATH=/data/cameras
-      - PASSWORDS_PATH=/opt/tapes/passwords
+      - TZ=${TZ:-UTC}
     env_file:
       - .env
     ports:
@@ -14,6 +26,8 @@ services:
     volumes:
       - ./data/cameras:/data/cameras
       - ./passwords:/opt/tapes/passwords:ro
+    depends_on:
+      - mediamtx
 
 networks:
 

@@ -1,338 +1,286 @@
-# Tapes - Security Camera Recording & Event Management System
+# tapes - Home Security Camera Recording System
 
-Tapes is a production-ready web application for viewing and managing security camera recordings and events. Built with a Go backend and React frontend, it provides complete dual-mode operation for continuous recordings and event-triggered captures with Docker deployment.
+I've been tinkering with IP cameras at home for years. What started as a single camera monitoring the driveway turned into a multi-camera system, and with it came the realization that commercial solutions were either too expensive, too limited, or required subscriptions that felt unnecessary. I wanted something simple: capture video from my cameras continuously, store it efficiently, and make it available for whatever I needed—whether that was viewing in HomeKit, running AI detection, or just reviewing footage when the neighbor's cat set off the motion sensor again.
 
-## Current Status
+tapes is the result of that journey. It's built around a straightforward idea: use proven open-source tools to capture RTSP streams from IP cameras, save continuous recordings in manageable interval files, and provide a foundation for everything else. The recordings become source material for AI-based event detection, live viewing through HomeKit, or simply browsing through footage when you need to see what happened last Tuesday afternoon.
 
-### ✅ Production Ready & Refactored (July 2025)
-- **Complete Dual-Mode System**: recordings + events fully operational
-- **Modular Go Architecture**: refactored into internal packages for maintainability
-- **Unified Video Processing**: single processing pipeline for all video types
-- **Docker Deployment**: OpenCV 4.12 compatible build with gocv integration
-- **Three-Control Interface**: camera/date/type selector with responsive layout
-- **Background Processing**: streamlined thumbnail generation (no file deletion)
-- **API Complete**: all endpoints active and tested
-- **Authentication**: JWT with htpasswd integration
+This isn't trying to be a complete commercial NVR replacement with every feature imaginable. Instead, it's a solid foundation that handles the core job well—continuous recording with a clean web interface—and stays out of your way when you want to build on top of it. The system has been running in production for months, quietly doing its job while I've refined the pieces that matter.
 
-## Features
+Recent improvements have simplified the architecture significantly: MediaMTX now handles recording natively using crash-resilient fragmented MP4 files, automatic retention management keeps disk usage in check, and structured logging makes debugging straightforward. The result is a cleaner, more reliable system that just works.
 
-- **Dual Mode Operation**: seamless switching between continuous recordings and event-triggered captures
-- **Multi-Camera Support**: view recordings/events from multiple cameras with easy selection
-- **Date-Based Navigation**: browse historical footage by date with thumbnail previews
-- **Automatic Thumbnail Generation**: background processing creates thumbnails for all videos
-- **Event Classification**: events categorized by type (motion, person, vehicle, etc.)
-- **Responsive UI**: modern React interface with Bootstrap styling optimized for mobile
-- **JWT Authentication**: secure access with htpasswd-based user management
-- **Docker Ready**: production containerization with security best practices
+## Overview
 
-## Architecture
+tapes is built on three core components that work together:
 
-### Recording vs Events
-- **Recordings**: continuous 15-minute MP4 segments captured via FFmpeg (format: `YYYYMMDDHHMMSS.mp4`)
-- **Events**: motion/AI-triggered shorter clips with classification (format: `YYYYMMDDHHMMSS-eventtype.mp4`)
-- **Unified Interface**: single UI to browse both types with seamless mode switching
-- **Thumbnail Generation**: automatic .jpg creation for all video files
+- **MediaMTX**: Proxies your IP camera RTSP streams and handles native continuous recording (no FFmpeg needed)
+- **tapes web application**: Go backend with React frontend for browsing and viewing recordings
+- **Storage**: Simple file-based storage with automatic thumbnail generation and retention management
 
-### Tech Stack  
-- **Backend**: Go 1.22 with modular internal package architecture
-- **Frontend**: React 18 with TypeScript and Bootstrap 5
-- **Video Processing**: FFmpeg + OpenCV 4.12 (GoCV) for thumbnail generation
-- **Streaming**: MediaMTX for RTSP proxy and process management
-- **Deployment**: Docker with gocv/opencv:4.12.0 builder, Debian runtime
-- **Storage**: file-based with unified video processing pipeline
+Everything runs in Docker containers orchestrated by docker-compose for easy deployment and management.
 
-## System Dependencies
+## What You Need
 
-This application integrates with several components to provide a complete security camera solution:
+Before you begin, you'll need:
 
-### FFmpeg
-FFmpeg handles video capture and processing.
+- A Linux server (Ubuntu/Debian recommended)
+- Docker and docker-compose installed
+- One or more IP cameras with RTSP streams
+- Basic command line familiarity
+- Camera stream URLs in format: `rtsp://user:password@ip:port/path`
 
-Install ffmpeg:
+## Setup and Install
+
+### 1. Prepare the Filesystem
+
+Create the directory structure for your camera recordings:
+
 ```bash
-sudo apt install ffmpeg
+sudo mkdir -p /data/cameras/{garage,kitchen,study}
+sudo chmod -R 755 /data/cameras
 ```
 
-### MediaMTX
-MediaMTX proxies RTSP streams and manages recording processes.
-
-Install MediaMTX:
-```bash
-sudo su
-mkdir /opt/mediamtx
-wget https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_v1.11.3_linux_amd64.tar.gz
-tar -xzf mediamtx_v1.11.3_linux_amd64.tar.gz
-exit
-```
-
-**Configuration Example** (mediamtx.yml):
-```yaml
-  garage:
-    source: rtsp://user:password@192.168.100.101:554/live/ch0
-    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/garage -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/garage/recordings/%Y%m%d%H%M%S.mp4
-    runOnReadyRestart: yes
-  
-  kitchen:
-    source: rtsp://user:password@192.168.100.102:554/live/ch0
-    runOnReady: ffmpeg -loglevel error -i rtsp://localhost:8554/kitchen -c copy -f segment -segment_format mp4 -segment_time 900 -segment_atclocktime 1 -reset_timestamps 1 -strftime 1 /data/cameras/kitchen/recordings/%Y%m%d%H%M%S.mp4
-    runOnReadyRestart: yes
-```
-
-*Note: Recordings are captured in 15-minute (900 second) segments for optimal storage and playback.*
-
-### HomeKit Integration
-HomeBridge exposes cameras for real-time viewing in Apple HomeKit.
-
-Install Homebridge:
-```bash
-cd /tmp
-curl -sSfL https://repo.homebridge.io/KEY.gpg | sudo gpg --dearmor | sudo tee /usr/share/keyrings/homebridge.gpg > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/homebridge.gpg] https://repo.homebridge.io stable main" | sudo tee /etc/apt/sources.list.d/homebridge.list > /dev/null
-sudo apt update
-sudo apt install homebridge
-```
-
-Setup via UI at http://server-ip:8581 and install "Homebridge Camera FFmpeg" plugin.
-
-**Camera Configuration**:
-```json
-{
-  "name": "garage",
-  "videoConfig": {
-    "source": "-i rtsp://localhost:8554/garage"
-  }
-}
-```
-
-### OpenCV (GoCV)
-Required for thumbnail generation and video processing.
-
-**Docker Deployment**: OpenCV 4.12 is automatically included via the `gocv/opencv:4.12.0` builder image.
-
-**Manual Installation** (OpenCV 4.12):
-```bash
-sudo su
-mkdir /opt/gocv
-cd /opt/gocv
-
-wget -O opencv.zip https://github.com/opencv/opencv/archive/4.12.0.zip
-unzip opencv.zip
-mkdir build
-cd build
-cmake -D HAVE_FFMPEG=ON -D OPENCV_GENERATE_PKGCONFIG=YES ../opencv-4.12.0
-cmake --build .
-make install
-```
-
-*Note: Docker deployment is recommended as it eliminates OpenCV version compatibility issues.*
-
-## Quick Start (Docker - Recommended)
-
-### 1. Clone Repository
-```bash
-git clone git@github.com:vicgarcia/tapes.git
-cd tapes
-```
-
-### 2. Setup Environment
-```bash
-# create environment file from template
-cp .env.template .env
-
-# edit .env with your settings (minimum: JWT_KEY)
-nano .env
-```
-
-### 3. Create Directory Structure
-```bash
-# create camera directories
-mkdir -p data/cameras/{garage,kitchen,study}/{recordings,events}
-
-# create htpasswd file for authentication
-htpasswd -c passwords admin
-```
-
-### 4. Deploy with Docker
-```bash
-# build and run with docker compose
-docker-compose up --build -d
-
-# check logs
-docker logs tapes
-```
-
-The application will be available at **http://localhost:8080**
-
-### 5. Add Video Files
-Place video files in the appropriate directories:
-- **Recordings**: `data/cameras/{camera}/recordings/YYYYMMDDHHMMSS.mp4`
-- **Events**: `data/cameras/{camera}/events/YYYYMMDDHHMMSS-eventtype.mp4`
-
-Thumbnails will be automatically generated on the next hourly background process.
-
-## Manual Installation (Advanced)
-
-For non-Docker deployment, you'll need to install dependencies and build manually:
-
-### Dependencies
-```bash
-sudo apt install apache2-utils ffmpeg
-# install go 1.22, node.js 23, opencv 4.10 (see system dependencies section)
-```
-
-### Build & Deploy
-```bash
-# build frontend
-cd ui && npm install && npm run build
-
-# build backend  
-cd api && go build -o tapes .
-
-# create directories and copy files
-sudo mkdir -p /opt/tapes /data/cameras
-sudo cp tapes /opt/tapes/
-sudo cp .env /opt/tapes/
-
-# run application
-cd /opt/tapes && ./tapes
-```
-
-The application will be available at **http://localhost:8080**
-
-## File Structure
+Replace `garage`, `kitchen`, and `study` with your actual camera names. The structure will look like:
 
 ```
 /data/cameras/
-├── garage/
-│   ├── recordings/     # Continuous 15-minute segments
-│   │   ├── 20250720143000.mp4
-│   │   ├── 20250720143000.jpg  (thumbnail)
-│   │   └── ...
-│   └── events/         # Event-triggered clips
-│       ├── 20250720143045-motion.mp4
-│       ├── 20250720143045-motion.jpg
-│       └── ...
+├── garage/             # Video files go directly here
 ├── kitchen/
-│   ├── recordings/
-│   └── events/
 └── study/
-    ├── recordings/
-    └── events/
 ```
 
-## API Endpoints
+MediaMTX will create video files directly in each camera directory—no subdirectories needed.
 
-All endpoints require JWT authentication via `Authorization: Bearer <token>` header.
+### 2. Clone the Repository
 
-### Authentication
-- `POST /login` - user authentication with htpasswd credentials
-- `POST /logout` - session termination
-- `GET /auth` - validate current session
-
-### Camera Management  
-- `GET /cameras` - list all available cameras
-
-### Recordings (Complete)
-- `GET /cameras/{camera}/recordings?day=YYYY-MM-DD` - get recordings for date
-- `GET /cameras/{camera}/recordings/{timestamp}/video` - stream recording video
-- `GET /cameras/{camera}/recordings/{timestamp}/thumbnail` - get recording thumbnail
-
-### Events (Complete)
-- `GET /cameras/{camera}/events?day=YYYY-MM-DD` - get events for date
-- `GET /cameras/{camera}/events/{slug}/video` - stream event video (slug = timestamp-eventtype)
-- `GET /cameras/{camera}/events/{slug}/thumbnail` - get event thumbnail (slug = timestamp-eventtype)
-
-### Frontend Interface
-
-The React frontend provides a clean, responsive interface:
-- **Three-Control Header**: Camera, Date, and Type selectors on desktop
-- **Mobile Responsive**: Controls stack vertically on tablets/phones
-- **Type Switching**: seamless switching between "RECORDINGS" and "EVENTS" modes
-- **Video Codec Support**: Recordings (H.264) play natively, Events (MPEG-4) may require browser support
-- **Thumbnail Grid**: automatic thumbnail generation and display
-- **Professional Design**: clean header layout with proper spacing and mobile optimization
-
-All video playback and thumbnail display automatically adapts based on the selected mode.
-
-## Development
-
-### Frontend Development
 ```bash
-cd ui
-npm install
-npm run dev  # Development server
-npm run build  # Production build
+git clone https://github.com/vicgarcia/tapes.git
+cd tapes
 ```
 
-### Backend Development
+### 3. Configure Environment Variables
+
+Create your environment configuration:
+
 ```bash
-cd api
-go mod tidy
-go run .
+cp .env.template .env
+nano .env
 ```
 
-### Build & Test Commands
-- `npm run lint` - Frontend linting
-- `npm run typecheck` - TypeScript checking
-- `go fmt ./...` - Go code formatting
-- `go test ./...` - Run Go tests
+Edit the `.env` file with your settings:
 
-## Background Processing
+```bash
+# Required
+JWT_KEY=your-secret-key-here              # Generate with: openssl rand -hex 32
 
-The application runs a unified hourly background task to:
-- **Generate thumbnails** for all video files that don't have them
-- **Process recordings and events** through single pipeline
-- **Smart file handling** - skips most recent file (actively recording)
-- **No file deletion** - all videos are preserved indefinitely
+# Optional (defaults shown)
+STORAGE_PATH=/data/cameras                # Path to camera recordings
+PASSWORDS_PATH=/opt/tapes/passwords       # Path to htpasswd file
+JWT_ISSUER=tapes                          # JWT issuer identifier
+DEBUG=false                               # Enable debug logging (true/false)
+RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep forever)
+```
 
-### Processing Details
-- **Frequency**: every hour via background goroutine
-- **Function**: ProcessAllVideos() scans all camera directories uniformly
-- **Action**: creates .jpg thumbnails using OpenCV 4.12 when missing
-- **Architecture**: unified processing eliminates code duplication
-- **File preservation**: no deletion of empty files or old videos (removed July 2025)
+**Important**: Generate a secure JWT_KEY with `openssl rand -hex 32` - don't use a simple password.
 
-## Event Processing
+### 4. Create Authentication File
 
-Events are processed with the following logic:
-- **File naming**: `{timestamp}-{event_type}.mp4` format (e.g., `20250726143045-motion.mp4`)
-- **Thumbnail generation**: same automatic processing as recordings
-- **Event types**: motion, person, vehicle, package, etc. (determined by filename)
-- **No retention policy**: all event files are preserved indefinitely
+Create a password file for web interface access:
+
+```bash
+htpasswd -c passwords admin        # Create file with first user
+htpasswd passwords viewer          # Add additional users
+```
+
+### 5. Configure MediaMTX
+
+Edit the MediaMTX configuration at `mediamtx.yml`:
+
+```yaml
+paths:
+  garage:
+    source: rtsp://user:password@192.168.1.101:554/live/ch0
+    sourceProtocol: tcp
+
+  kitchen:
+    source: rtsp://user:password@192.168.1.102:554/live/ch0
+    sourceProtocol: tcp
+```
+
+That's it! MediaMTX handles recording automatically using the global defaults already configured in `mediamtx.yml`:
+
+- **Native recording**: Built-in recording (no FFmpeg needed)
+- **Format**: Fragmented MP4 (fmp4) - resilient to crashes
+- **Segment duration**: 5-minute video files
+- **Part duration**: 1-second disk flush (max 1s data loss on crash)
+- **Retention**: Auto-delete after 90 days (configurable)
+- **Filename format**: `YYYYMMDDHHMMSS.mp4` (e.g., `20251109143000.mp4`)
+
+Simply add your camera's RTSP URL and MediaMTX handles the rest.
+
+### 6. Start the System
+
+Launch both MediaMTX and tapes with docker-compose:
+
+```bash
+docker-compose up -d
+```
+
+Check that everything is running:
+
+```bash
+docker-compose ps
+docker-compose logs
+```
+
+The web application will be available at `http://your-server:8671`.
+
+Verify recordings are being created by checking for video files in `/data/cameras/{camera}/`.
+
+## Using tapes
+
+Once running, open `http://your-server:8671` in your browser:
+
+1. **Login** with credentials from your htpasswd file
+2. **Select Camera** from the dropdown
+3. **Choose Date** to browse recordings
+4. **Click thumbnails** to play videos
+
+The interface automatically generates thumbnails for all videos hourly. Recordings are played as native H.264 video in your browser. Videos are stored in 5-minute segments, making it easy to find exactly what you need.
 
 ## Production Deployment
 
-### Docker Production (Recommended)
-The included Docker setup provides production-ready deployment:
-- **Two-stage build**: optimized container size with minimal runtime
-- **Security**: non-root user, proper permissions
-- **Environment**: configurable via .env file
-- **Volumes**: persistent data and authentication files
-- **Health checks**: automatic container monitoring
+### Storage Management
 
-### Additional Production Considerations
-- **Reverse proxy**: use nginx for SSL/domain handling
-- **Storage monitoring**: implement capacity alerting for video directories
-- **Log management**: configure log rotation and centralized logging
-- **Backup strategy**: regular backup of htpasswd and configuration files
-- **Performance**: monitor container resources and scale if needed
+Monitor disk usage regularly:
+
+```bash
+df -h /data/cameras
+```
+
+With 5-minute segments, storage usage depends on your bitrate. Typical cameras at 2-4 Mbps use roughly:
+
+- **Per camera**: 1-2 GB per day, 30-60 GB per month
+- **Three cameras**: 3-6 GB per day, 90-180 GB per month
+
+By default, tapes automatically deletes recordings older than 90 days. You can adjust this in `.env`:
+
+```bash
+RETENTION_DAYS=90    # Auto-delete after 90 days
+RETENTION_DAYS=0     # Keep forever (disable auto-deletion)
+```
+
+Note that MediaMTX also has its own retention setting in `mediamtx.yml` (`recordDeleteAfter`). Both can run independently—set them to match for consistency.
+
+### Reverse Proxy
+
+For SSL and domain access, use nginx:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name cameras.yourdomain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:8671;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Troubleshooting
+
+### No video files appearing
+
+Check MediaMTX container is running and recording:
+
+```bash
+docker-compose ps
+docker-compose logs mediamtx
+```
+
+Verify camera URLs are correct and accessible from your server. Check that recordings are being created in `/data/cameras/{camera}/`.
+
+### Thumbnails not generating
+
+Check disk space and verify tapes has write permissions to camera directories. Thumbnails generate hourly automatically. Enable debug logging to see detailed thumbnail generation:
+
+```bash
+# In .env file
+DEBUG=true
+```
+
+Then check logs: `docker-compose logs tapes`
+
+### Can't login to web interface
+
+Verify htpasswd file exists and contains users:
+
+```bash
+cat passwords
+```
+
+Check JWT_KEY is set in `.env` file and is a secure random key (not a simple password).
+
+### Enable debug logging
+
+For detailed diagnostics, enable debug mode in `.env`:
+
+```bash
+DEBUG=true
+```
+
+This shows all request details, thumbnail generation, and processing information in the logs.
+
+## Architecture Details
+
+### File Naming Convention
+
+- **Recordings**: `YYYYMMDDHHMMSS.mp4` (timestamp when segment started)
+- **Thumbnails**: `.jpg` files with matching names
+
+### API Endpoints
+
+All endpoints require JWT authentication:
+
+- `POST /login` - Authenticate with htpasswd credentials
+- `GET /cameras` - List available cameras
+- `GET /cameras/{camera}/recordings?day=YYYY-MM-DD` - Get recordings for date
+- `GET /cameras/{camera}/recordings/{timestamp}/video` - Stream recording
+- `GET /cameras/{camera}/recordings/{timestamp}/thumbnail` - Get thumbnail
+
+### Background Processing
+
+tapes runs an hourly background task that:
+
+- Scans all camera directories for video files
+- Generates thumbnails for any videos missing them using OpenCV
+- Skips the most recent file (may still be recording)
+- Deletes videos older than RETENTION_DAYS (default: 90 days)
+- Removes zero-byte files (corrupted recordings)
+
+All processing is logged with structured output for easy monitoring.
 
 ## Contributing
 
-This project follows standard Go and React development practices. See `CLAUDE.md` for comprehensive development context and LLM-assisted development guidelines.
+See `CLAUDE.md` for development guidelines and architecture decisions.
 
-### Development Setup
+### Development
+
 ```bash
-# frontend development
+# Frontend development
 cd ui && npm run dev
 
-# backend development  
+# Backend development
 cd api && go run .
 
-# code formatting
-npm run lint && npm run typecheck && go fmt ./...
+# Code formatting
+npm run lint && go fmt ./...
 ```
 
 ## License
 
-[License information to be added]
+[License to be determined]

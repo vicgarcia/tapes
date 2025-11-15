@@ -1,21 +1,22 @@
 package media
 
 import (
-	"log"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/vicgarcia/tapes/internal/cameras"
+	"github.com/vicgarcia/tapes/internal/env"
+	"github.com/vicgarcia/tapes/internal/logger"
 )
 
 // VideoFile represents any video file in the system with its metadata
 type VideoFile struct {
-	Path      string
-	Directory string // "recordings" or "events"
-	Camera    string
-	Filename  string
+	Path     string
+	Camera   string
+	Filename string
 }
 
 // GetAllVideoFiles discovers all video files across all cameras and directories
@@ -28,11 +29,11 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 	var allVideos []VideoFile
 
 	for _, camera := range cameras {
-		// Get videos from recordings directory
-		pattern := filepath.Join(camera.RecordingsPath(), "*.mp4")
+		// Get videos from camera directory
+		pattern := filepath.Join(camera.Path, "*.mp4")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
-			log.Printf("error getting recordings for camera %s: %v", camera.Name, err)
+			logger.Error("error getting recordings for camera", "camera", camera.Name, "error", err)
 		} else {
 			sort.Strings(files)
 			// Skip last file, likely to be actively being written to
@@ -41,31 +42,9 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 			}
 			for _, file := range files {
 				allVideos = append(allVideos, VideoFile{
-					Path:      file,
-					Directory: "recordings",
-					Camera:    camera.Name,
-					Filename:  filepath.Base(file),
-				})
-			}
-		}
-
-		// Get videos from events directory
-		pattern = filepath.Join(camera.EventsPath(), "*.mp4")
-		files, err = filepath.Glob(pattern)
-		if err != nil {
-			log.Printf("error getting events for camera %s: %v", camera.Name, err)
-		} else {
-			sort.Strings(files)
-			// Skip last file, likely to be actively being written to
-			if len(files) > 0 {
-				files = files[:len(files)-1]
-			}
-			for _, file := range files {
-				allVideos = append(allVideos, VideoFile{
-					Path:      file,
-					Directory: "events",
-					Camera:    camera.Name,
-					Filename:  filepath.Base(file),
+					Path:     file,
+					Camera:   camera.Name,
+					Filename: filepath.Base(file),
 				})
 			}
 		}
@@ -81,62 +60,106 @@ func GetAllVideoFiles() ([]VideoFile, error) {
 
 // ProcessAllVideos is the main processing function that handles all video files
 func ProcessAllVideos() {
-	log.Println("Starting video processing for thumbnail generation")
+	logger.Info("starting video processing for thumbnail generation and cleanup")
 
 	videos, err := GetAllVideoFiles()
 	if err != nil {
-		log.Printf("error getting video files: %v", err)
+		logger.Error("error getting video files", "error", err)
 		return
 	}
 
+	// Get retention days from environment (default: 90 days)
+	retentionDays := env.GetInt("RETENTION_DAYS", 90)
+
 	processedCount := 0
 	createdCount := 0
+	deletedCount := 0
 	currentTime := time.Now()
 
 	for _, video := range videos {
-		if processVideoFile(video, currentTime) {
+		created, deleted := processVideoFile(video, currentTime, retentionDays)
+		if created {
 			createdCount++
+		}
+		if deleted {
+			deletedCount++
 		}
 		processedCount++
 	}
 
-	log.Printf("Video processing complete: processed %d videos, created %d thumbnails",
-		processedCount, createdCount)
+	logger.Info("video processing complete",
+		"processed", processedCount,
+		"created", createdCount,
+		"deleted", deletedCount)
 }
 
-// processVideoFile processes a single video file for thumbnail generation
-func processVideoFile(video VideoFile, currentTime time.Time) bool {
-	// Get the thumbnail path by replacing .mp4 with .jpg
+// processVideoFile processes a single video file for thumbnail generation and cleanup
+// Returns (thumbnailCreated, videoDeleted)
+func processVideoFile(video VideoFile, currentTime time.Time, retentionDays int) (bool, bool) {
 	thumbnailPath := GetThumbnailPath(video.Path)
 
-	// Check if thumbnail already exists
-	if FileExists(thumbnailPath) {
-		return false // No thumbnail created
-	}
-
-	// Parse filename for logging (optional, for age tracking)
+	// Parse filename to get date
 	filename := strings.TrimSuffix(video.Filename, filepath.Ext(video.Filename))
 	timestampPart := filename
 	if strings.Contains(filename, "-") {
 		timestampPart = strings.Split(filename, "-")[0]
 	}
 
+	// Check if video should be deleted
 	if len(timestampPart) >= 8 {
 		if parsedDate, err := time.Parse("20060102", timestampPart[:8]); err == nil {
 			diff := currentTime.Sub(parsedDate)
 			daysAgo := int(diff.Hours() / 24)
-			log.Printf("Creating thumbnail for %s/%s (video is %d days old)",
-				video.Camera, video.Filename, daysAgo)
+
+			// Delete video if older than retention period (only if retention is enabled)
+			if retentionDays > 0 && daysAgo > retentionDays {
+				logger.Info("deleting old video",
+					"camera", video.Camera,
+					"filename", video.Filename,
+					"days_old", daysAgo,
+					"retention", retentionDays)
+				deleteVideoAndThumbnail(video.Path, thumbnailPath)
+				return false, true
+			}
+
+			// Check if video file is empty and delete if so
+			if fileInfo, err := os.Stat(video.Path); err == nil && fileInfo.Size() == 0 {
+				logger.Info("deleting empty video",
+					"camera", video.Camera,
+					"filename", video.Filename)
+				deleteVideoAndThumbnail(video.Path, thumbnailPath)
+				return false, true
+			}
 		}
 	}
 
-	// Generate thumbnail
-	_, err := GenerateThumbnail(video.Path)
-	if err != nil {
-		log.Printf("error generating thumbnail for %s: %v", video.Path, err)
-		return false
+	// Create thumbnail if it doesn't exist
+	if !FileExists(thumbnailPath) {
+		// Generate thumbnail
+		_, err := GenerateThumbnail(video.Path)
+		if err != nil {
+			logger.Error("error generating thumbnail", "path", video.Path, "error", err)
+			return false, false
+		}
+
+		logger.Debug("created thumbnail", "path", thumbnailPath)
+		return true, false
 	}
 
-	log.Printf("Created thumbnail: %s", thumbnailPath)
-	return true // Thumbnail created
+	return false, false
+}
+
+// deleteVideoAndThumbnail removes both the video file and its associated thumbnail
+func deleteVideoAndThumbnail(videoPath, thumbnailPath string) {
+	// Delete thumbnail if it exists
+	if FileExists(thumbnailPath) {
+		if err := os.Remove(thumbnailPath); err != nil {
+			logger.Error("error deleting thumbnail", "path", thumbnailPath, "error", err)
+		}
+	}
+
+	// Delete video file
+	if err := os.Remove(videoPath); err != nil {
+		logger.Error("error deleting video", "path", videoPath, "error", err)
+	}
 }

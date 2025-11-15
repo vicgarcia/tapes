@@ -8,16 +8,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/tg123/go-htpasswd"
+	"github.com/vicgarcia/tapes/internal/env"
 )
 
 const cookieName = "tapes"
 
 // GetPasswd loads the htpasswd file for password validation
 func GetPasswd() (*htpasswd.File, error) {
-	passwdPath := os.Getenv("PASSWORDS_PATH")
-	if passwdPath == "" {
-		return &htpasswd.File{}, fmt.Errorf("missing PASSWORDS_PATH environment variable")
-	}
+	passwdPath := env.GetWithDefault("PASSWORDS_PATH", "/opt/tapes/passwords")
 
 	passwd, err := htpasswd.New(passwdPath, htpasswd.DefaultSystems, nil)
 	if err != nil {
@@ -29,10 +27,7 @@ func GetPasswd() (*htpasswd.File, error) {
 
 // GenerateJWTToken creates a new JWT token for the given username
 func GenerateJWTToken(username string) (string, error) {
-	issuer := os.Getenv("JWT_ISSUER")
-	if issuer == "" {
-		issuer = "tapes"
-	}
+	issuer := env.GetWithDefault("JWT_ISSUER", "tapes")
 
 	key := os.Getenv("JWT_KEY")
 	if key == "" {

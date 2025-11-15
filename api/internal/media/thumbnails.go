@@ -2,10 +2,10 @@ package media
 
 import (
 	"errors"
+	"gocv.io/x/gocv"
 	"image"
 	"os"
 	"strings"
-	"gocv.io/x/gocv"
 )
 
 // GetThumbnailPath returns the thumbnail path for a video path

@@ -12,7 +12,7 @@ import (
 // GetRecordingsByDay returns recordings for a specific camera and day
 func GetRecordingsByDay(camera cameras.Camera, day string) ([]Recording, error) {
 	dayQuery := strings.Replace(day, "-", "", -1)
-	files, err := filepath.Glob(filepath.Join(camera.RecordingsPath(), dayQuery+"*.mp4"))
+	files, err := filepath.Glob(filepath.Join(camera.Path, dayQuery+"*.mp4"))
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,6 @@ func GetRecordingsByDay(camera cameras.Camera, day string) ([]Recording, error) 
 
 // GetRecordingPath returns the path to a recording file by camera and timestamp
 func GetRecordingPath(camera cameras.Camera, timestamp string) string {
-	recordingPath := filepath.Join(camera.RecordingsPath(), timestamp+".mp4")
+	recordingPath := filepath.Join(camera.Path, timestamp+".mp4")
 	return recordingPath
 }

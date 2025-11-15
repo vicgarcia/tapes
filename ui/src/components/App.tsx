@@ -4,7 +4,7 @@ import { AuthProvider, RequireAuth, Logout } from "@app/services/auth";
 import { Login } from "@app/components/Login";
 import { Dashboard } from "@app/components/Dashboard";
 
-function App() {
+export default function App() {
     return <HashRouter>
         <AuthProvider>
             <Routes>
@@ -16,5 +16,3 @@ function App() {
         </AuthProvider>
     </HashRouter>
 }
-
-export default App;

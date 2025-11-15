@@ -3,8 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -32,14 +33,16 @@ func AuthHandler(writer http.ResponseWriter, request *http.Request) {
 func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 	request.ParseForm()
 
+	username := request.FormValue("username")
+	logger.Info("login attempt", "username", username, "remote_addr", request.RemoteAddr)
+
 	passwd, err := auth.GetPasswd()
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to get password file", "error", err)
 		http.Error(writer, "login failed", http.StatusInternalServerError)
 		return
 	}
 
-	username := request.FormValue("username")
 	password := request.FormValue("password")
 	if username == "" || password == "" {
 		http.Error(writer, "login failed", http.StatusUnauthorized)
@@ -54,7 +57,7 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 
 	err = auth.SetCookie(writer, username)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to set auth cookie", "error", err)
 		http.Error(writer, "login failed", http.StatusUnauthorized)
 		return
 	}
@@ -66,9 +69,11 @@ func LoginHandler(writer http.ResponseWriter, request *http.Request) {
 
 // LogoutHandler clears the auth cookie
 func LogoutHandler(writer http.ResponseWriter, request *http.Request) {
+	logger.Info("logout", "remote_addr", request.RemoteAddr)
+
 	err := auth.DeleteCookie(writer)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to delete auth cookie", "error", err)
 		http.Error(writer, "logout failed", http.StatusUnauthorized)
 	}
 
@@ -79,6 +84,8 @@ func LogoutHandler(writer http.ResponseWriter, request *http.Request) {
 
 // CamerasHandler returns json list of cameras
 func CamerasHandler(writer http.ResponseWriter, request *http.Request) {
+	logger.Info("cameras request", "remote_addr", request.RemoteAddr)
+
 	cameras, err := cameras.GetAll()
 	if err != nil {
 		http.Error(writer, "error querying cameras", http.StatusInternalServerError)
@@ -101,27 +108,27 @@ func RecordingsHandler(writer http.ResponseWriter, request *http.Request) {
 	cameraName := vars["camera"]
 	day := request.URL.Query().Get("day")
 
-	logger.Debug(fmt.Sprintf("RecordingsHandler called for camera=%s, day=%s", cameraName, day))
+	logger.Info("recordings request", "camera", cameraName, "day", day, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
-		logger.Error(fmt.Sprintf("invalid camera %s: %v", cameraName, err))
+		logger.Error("invalid camera", "camera", cameraName, "error", err)
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
 	recordings, err := media.GetRecordingsByDay(camera, day)
 	if err != nil {
-		logger.Error(fmt.Sprintf("error querying recordings for camera %s, day %s: %v", cameraName, day, err))
+		logger.Error("error querying recordings", "camera", cameraName, "day", day, "error", err)
 		http.Error(writer, "error querying recordings", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Debug(fmt.Sprintf("found %d recordings for camera %s, day %s", len(recordings), cameraName, day))
+	logger.Debug("found recordings", "camera", cameraName, "day", day, "count", len(recordings))
 
 	response, err := json.Marshal(recordings)
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to marshal recordings json: %v", err))
+		logger.Error("failed to marshal recordings json", "error", err)
 		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +143,7 @@ func RecordingThumbnailHandler(writer http.ResponseWriter, request *http.Request
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	logger.Debug(fmt.Sprintf("RecordingThumbnailHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
+	logger.Info("thumbnail request", "camera", cameraName, "timestamp", timestamp, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -169,7 +176,7 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	cameraName := vars["camera"]
 	timestamp := vars["timestamp"]
 
-	logger.Debug(fmt.Sprintf("RecordingVideoHandler called for camera=%s, timestamp=%s", cameraName, timestamp))
+	logger.Info("video request", "camera", cameraName, "timestamp", timestamp, "remote_addr", request.RemoteAddr)
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
@@ -185,100 +192,77 @@ func RecordingVideoHandler(writer http.ResponseWriter, request *http.Request) {
 	http.ServeFile(writer, request, recordingPath)
 }
 
-// EventsHandler queries events by date
-func EventsHandler(writer http.ResponseWriter, request *http.Request) {
+// LiveStreamHandler proxies hls live stream requests to mediamtx
+func LiveStreamHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	cameraName := vars["camera"]
-	day := request.URL.Query().Get("day")
+	pathSuffix := strings.TrimPrefix(request.URL.Path, fmt.Sprintf("/cameras/%s/live/", cameraName))
 
-	logger.Debug(fmt.Sprintf("EventsHandler called for camera=%s, day=%s", cameraName, day))
+	// log playlist requests at info level, segments at debug level
+	if strings.HasSuffix(pathSuffix, ".m3u8") {
+		logger.Info("live stream request", "camera", cameraName, "path", pathSuffix, "remote_addr", request.RemoteAddr)
+	} else {
+		logger.Debug("live stream segment", "camera", cameraName, "path", pathSuffix, "remote_addr", request.RemoteAddr)
+	}
 
 	camera, err := cameras.GetByName(cameraName)
 	if err != nil {
-		logger.Error(fmt.Sprintf("invalid camera %s: %v", cameraName, err))
+		logger.Error("invalid camera", "camera", cameraName, "error", err)
 		http.Error(writer, "invalid camera", http.StatusBadRequest)
 		return
 	}
 
-	logger.Debug(fmt.Sprintf("camera path: %s, events path: %s", camera.Path, camera.EventsPath()))
+	// construct mediamtx url and create proxy request
+	mediamtxURL := fmt.Sprintf("http://mediamtx:8888/%s/%s", camera.Name, pathSuffix)
+	logger.Debug("proxying to mediamtx", "url", mediamtxURL)
 
-	events, err := media.GetEventsByDay(camera, day)
+	proxyReq, err := http.NewRequest("GET", mediamtxURL, nil)
 	if err != nil {
-		logger.Error(fmt.Sprintf("error querying events for camera %s, day %s: %v", cameraName, day, err))
-		http.Error(writer, "error querying events", http.StatusInternalServerError)
+		logger.Error("failed to create proxy request", "error", err)
+		http.Error(writer, "proxy error", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Debug(fmt.Sprintf("found %d events for camera %s, day %s", len(events), cameraName, day))
+	proxyReq.Header.Set("User-Agent", request.Header.Get("User-Agent"))
 
-	response, err := json.Marshal(events)
+	// execute proxy request to mediamtx
+	client := &http.Client{}
+	resp, err := client.Do(proxyReq)
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to marshal events json: %v", err))
-		http.Error(writer, "failed to generate json", http.StatusInternalServerError)
+		logger.Error("proxy request failed", "url", mediamtxURL, "error", err)
+		http.Error(writer, "stream unavailable", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Error("mediamtx returned error", "status", resp.StatusCode, "url", mediamtxURL)
+		http.Error(writer, "stream unavailable", resp.StatusCode)
 		return
 	}
 
-	writer.Header().Set("Content-Type", "application/json")
-	writer.Write(response)
-}
-
-// EventThumbnailHandler serves event thumbnail images, creates when they do not exist
-func EventThumbnailHandler(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-	cameraName := vars["camera"]
-	slug := vars["slug"]
-
-	logger.Debug(fmt.Sprintf("EventThumbnailHandler called for camera=%s, slug=%s", cameraName, slug))
-
-	camera, err := cameras.GetByName(cameraName)
-	if err != nil {
-		http.Error(writer, "invalid camera", http.StatusBadRequest)
-		return
-	}
-
-	// find the event file using the full slug
-	eventPath := media.GetEventPath(camera, slug)
-	if eventPath == "" || !media.FileExists(eventPath) {
-		http.Error(writer, "event file does not exist", http.StatusNotFound)
-		return
-	}
-
-	// get the thumbnail, will be created if it does not already exist
-	thumbnailPath := media.GetThumbnailPath(eventPath)
-	if !media.FileExists(thumbnailPath) {
-		thumbnailPath, err = media.GenerateThumbnail(eventPath)
-		if err != nil {
-			http.Error(writer, err.Error(), http.StatusInternalServerError)
-			return
+	// copy mediamtx response headers
+	for key, values := range resp.Header {
+		for _, value := range values {
+			writer.Header().Add(key, value)
 		}
 	}
 
-	http.ServeFile(writer, request, thumbnailPath)
-}
+	// set content type and cors headers
+	if strings.HasSuffix(pathSuffix, ".m3u8") {
+		writer.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	} else if strings.HasSuffix(pathSuffix, ".ts") {
+		writer.Header().Set("Content-Type", "video/mp2t")
+	}
 
-// EventVideoHandler serves event video files
-func EventVideoHandler(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-	cameraName := vars["camera"]
-	slug := vars["slug"]
-	
-	logger.Debug(fmt.Sprintf("EventVideoHandler called for camera=%s, slug=%s", cameraName, slug))
+	writer.Header().Set("Access-Control-Allow-Origin", "*")
+	writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	camera, err := cameras.GetByName(cameraName)
+	// stream response to client
+	writer.WriteHeader(resp.StatusCode)
+	_, err = io.Copy(writer, resp.Body)
 	if err != nil {
-		http.Error(writer, "invalid camera", http.StatusBadRequest)
-		return
+		logger.Error("failed to copy response body", "error", err)
 	}
-
-	// find the event file using the full slug
-	eventPath := media.GetEventPath(camera, slug)
-	logger.Debug(fmt.Sprintf("EventVideoHandler eventPath=%s, exists=%v", eventPath, media.FileExists(eventPath)))
-	if eventPath == "" || !media.FileExists(eventPath) {
-		logger.Error(fmt.Sprintf("Event file not found: path=%s", eventPath))
-		http.Error(writer, "event file does not exist", http.StatusNotFound)
-		return
-	}
-
-	logger.Debug(fmt.Sprintf("EventVideoHandler serving file: %s", eventPath))
-	http.ServeFile(writer, request, eventPath)
 }

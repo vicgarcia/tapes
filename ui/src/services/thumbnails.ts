@@ -1,6 +1,6 @@
 import httpClient from './base'
 
-export function getThumbnail(cameraName: string, slug: string, mediaType: 'recordings' | 'events') {
-    const url = `/cameras/${cameraName}/${mediaType}/${slug}/thumbnail`;
+export function getThumbnail(cameraName: string, timestamp: string) {
+    const url = `/cameras/${cameraName}/recordings/${timestamp}/thumbnail`;
     return httpClient.get(url, {responseType: 'blob'});
 }

@@ -2,32 +2,29 @@ import { useState, useEffect } from "react";
 import { Col } from "react-bootstrap";
 import dayjs from 'dayjs';
 import { getThumbnail } from "@app/services/thumbnails";
-import { Camera, Video } from "@app/types";
+import { Camera, Recording } from "@app/types";
 
 export type ThumbnailProps = {
     camera: Camera
-    video: Video
+    recording: Recording
     setActive: Function
-    mediaType: 'recordings' | 'events'
 }
 
-export function Thumbnail({camera, video, setActive, mediaType}: ThumbnailProps) {
+export function Thumbnail({camera, recording, setActive}: ThumbnailProps) {
     const [img, setImg] = useState<any|null>(null);
 
     useEffect(() => {
-        const slug = mediaType === 'events' && video.event_type 
-            ? `${video.timestamp}-${video.event_type}`
-            : video.timestamp;
-        getThumbnail(camera.name, slug, mediaType)
+        getThumbnail(camera.name, recording.timestamp)
             .then(response => setImg(URL.createObjectURL(response.data)))
     }, []);
 
     return img !== null ? <>
         <Col xs={4} className='thumbnail mb-3'
-            onClick={_ => setActive(video)}
+            id={`recording-${recording.timestamp}`}
+            onClick={_ => setActive(recording)}
         >
             <img src={img} className='thumbnail' />
-            <small>{dayjs(video.timestamp, 'YYYYMMDDHHmmss').format('hh:mm a')}</small>
+            <small>{dayjs(recording.timestamp, 'YYYYMMDDHHmmss').format('hh:mm a')}</small>
         </Col>
     </> : <></>
 }
