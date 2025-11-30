@@ -7,14 +7,13 @@ services:
     environment:
       - TZ=${TZ:-UTC}
     ports:
-      - "8554:8554"  # RTSP Local Proxy
+      - "8554:8554"
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
       - ./data/cameras:/cameras
 
   tapes:
     image: ghcr.io/vicgarcia/tapes:latest
-    build: .
     container_name: tapes
     restart: unless-stopped
     environment:

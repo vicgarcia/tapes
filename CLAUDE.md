@@ -393,8 +393,8 @@ time=2025-11-09T15:30:08Z level=debug msg="created thumbnail" path=/cameras/gara
 
 ### Docker Issues
 - Ensure `.env` file exists and is properly formatted
-- Check volume mounts are correct (`./data/cameras:/cameras` and `./passwords:/opt/tapes/passwords`)
-- Verify docker build completes both stages successfully
+- Check volume mounts are correct (camera storage path and `~/tapes/passwords:/opt/tapes/passwords`)
+- Verify pre-built image pulls successfully from ghcr.io
 - Check container logs with `docker logs tapes`
 
 ### MediaMTX Issues
@@ -473,21 +473,33 @@ func processVideoFile(video VideoFile, currentTime time.Time, retentionDays int)
 
 ### Docker Deployment (Recommended)
 ```bash
+# create installation directory
+mkdir -p ~/tapes
+cd ~/tapes
+
+# download configuration files
+curl -o docker-compose.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/docker-compose.yml
+curl -o .env.template https://raw.githubusercontent.com/vicgarcia/tapes/main/.env.template
+curl -o mediamtx.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/mediamtx.yml
+
 # create environment file
 cp .env.template .env
-# edit .env with your settings
+# edit .env with your settings (JWT_KEY, STORAGE_PATH, etc.)
 
 # configure MediaMTX
 # edit mediamtx.yml to add camera RTSP sources
 
-# create directory structure (no /recordings/ subdirectory)
-mkdir -p data/cameras/{camera1,camera2,camera3}
+# create directory structure for camera recordings
+mkdir -p /path/to/cameras/{camera1,camera2,camera3}
 
 # create htpasswd file
 htpasswd -c passwords admin
 
-# build and run both MediaMTX and tapes
-docker-compose up --build -d
+# edit docker-compose.yml to update volume paths
+# update camera storage path and passwords path in both mediamtx and tapes services
+
+# run both MediaMTX and tapes (pulls pre-built image from ghcr.io)
+docker-compose up -d
 
 # verify services are running
 docker-compose ps
@@ -495,21 +507,18 @@ docker logs mediamtx
 docker logs tapes
 ```
 
-### Manual Deployment
+### Local Development Build
+For development purposes, clone the repository and build locally:
 ```bash
-# build binary
-go build -o tapes ./api
+# clone repository
+git clone https://github.com/vicgarcia/tapes.git
+cd tapes
 
-# create directories
-mkdir -p /opt/tapes /cameras
+# build local docker image
+docker build -t ghcr.io/vicgarcia/tapes:local .
 
-# copy files
-cp tapes /opt/tapes/
-cp .env /opt/tapes/
-
-# create systemd service (optional)
-# run application
-cd /opt/tapes && ./tapes
+# this creates a local image with the 'local' tag
+# build takes 10-15 minutes due to OpenCV compilation
 ```
 
 ## Success Criteria

@@ -43,11 +43,22 @@ Replace `garage` and `kitchen` with your actual camera names. The structure will
 
 MediaMTX will create video files directly in each camera directory—no subdirectories needed.
 
-### 2. Clone the Repository
+### 2. Download Configuration Files
+
+Create the installation directory and download required files:
 
 ```bash
-git clone https://github.com/vicgarcia/tapes.git
-cd tapes
+mkdir -p ~/tapes
+cd ~/tapes
+
+# Download docker-compose configuration
+curl -o docker-compose.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/docker-compose.yml
+
+# Download environment template
+curl -o .env.template https://raw.githubusercontent.com/vicgarcia/tapes/main/.env.template
+
+# Download MediaMTX configuration
+curl -o mediamtx.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/mediamtx.yml
 ```
 
 ### 3. Configure Environment Variables
@@ -80,7 +91,7 @@ RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep fo
 Create a password file for web interface access:
 
 ```bash
-cd /path/to
+cd ~/tapes
 htpasswd -c passwords admin        # Create file with first user
 htpasswd passwords viewer          # Add additional users
 ```
@@ -111,7 +122,32 @@ That's it! MediaMTX handles recording automatically using the global defaults al
 
 Simply add your camera's RTSP URL and MediaMTX handles the rest.
 
-### 6. Start the System
+### 6. Edit Docker Compose Volumes
+
+Edit `docker-compose.yml` to match your camera storage path and passwords file location:
+
+```bash
+nano docker-compose.yml
+```
+
+Update the volume paths in both the `mediamtx` and `tapes` services:
+
+```yaml
+services:
+  mediamtx:
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - /path/to/cameras:/cameras        # Update this path
+
+  tapes:
+    volumes:
+      - /path/to/cameras:/cameras        # Update this path
+      - ~/tapes/passwords:/opt/tapes/passwords:ro
+```
+
+Replace `/path/to/cameras` with the actual path you created in step 1.
+
+### 7. Start the System
 
 Launch both MediaMTX and tapes with docker-compose:
 
@@ -128,16 +164,7 @@ docker-compose logs
 
 The web application will be available at `http://<server ip>:8671`.
 
-#### Container Images
-
-By default, `docker-compose up` will pull the pre-built tapes image from GitHub Container Registry (ghcr.io). This image is automatically built on every push to main via GitHub Actions, saving you 10-15 minutes of build time with OpenCV.
-
-To build locally for development instead:
-
-```bash
-docker-compose build tapes
-docker-compose up -d
-```
+The pre-built tapes image will be automatically pulled from GitHub Container Registry (ghcr.io), saving you 10-15 minutes of build time with OpenCV.
 
 ## Using tapes
 
@@ -224,6 +251,27 @@ tapes runs an hourly background task that:
 All processing is logged with structured output for easy monitoring.
 
 ## Development
+
+### Local Development Setup
+
+If you want to modify the code, clone the repository:
+
+```bash
+git clone https://github.com/vicgarcia/tapes.git
+cd tapes
+```
+
+### Building Locally
+
+To build the Docker image locally for development:
+
+```bash
+docker build -t ghcr.io/vicgarcia/tapes:local .
+```
+
+This creates a local image with the tag `local` that docker-compose will use instead of pulling from the registry. The build takes 10-15 minutes due to OpenCV compilation.
+
+### Development Commands
 
 ```bash
 # Frontend development
