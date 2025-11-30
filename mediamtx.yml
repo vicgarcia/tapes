@@ -62,8 +62,8 @@ pathDefaults:
 
   # Recording path pattern
   # %path = camera name (garage, kitchen, study)
-  # Result: /data/cameras/garage/20251108143000.mp4
-  recordPath: /data/cameras/%path/%Y%m%d%H%M%S
+  # Result: /cameras/garage/20251108143000.mp4
+  recordPath: /cameras/%path/%Y%m%d%H%M%S
 
   # Recording format: fmp4 (fragmented MP4)
   # Better crash resilience than mpegts, MP4 compatible

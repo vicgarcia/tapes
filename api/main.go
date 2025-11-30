@@ -79,7 +79,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				logger.Debug("running scheduled video processing")
+				logger.Info("running scheduled video processing")
 				media.ProcessAllVideos()
 			case <-done:
 				logger.Info("stopping background video processing")

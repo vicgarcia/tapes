@@ -10,11 +10,11 @@ services:
       - "8554:8554"  # RTSP Local Proxy
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
-      - ./data/cameras:/data/cameras
+      - ./data/cameras:/cameras
 
   tapes:
+    image: ghcr.io/vicgarcia/tapes:latest
     build: .
-    image: tapes:latest
     container_name: tapes
     restart: unless-stopped
     environment:
@@ -24,7 +24,7 @@ services:
     ports:
       - "8671:8671"
     volumes:
-      - ./data/cameras:/data/cameras
+      - ./data/cameras:/cameras
       - ./passwords:/opt/tapes/passwords:ro
     depends_on:
       - mediamtx

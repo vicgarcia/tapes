@@ -16,7 +16,7 @@ type Camera struct {
 
 // GetStoragePath returns the base storage path from environment variable
 func GetStoragePath() (string, error) {
-	storagePath := env.GetWithDefault("STORAGE_PATH", "/data/cameras")
+	storagePath := env.GetWithDefault("STORAGE_PATH", "/cameras")
 	return storagePath, nil
 }
 

@@ -1,0 +1,33 @@
+# Git and version control
+.git/
+.github/
+.gitignore
+
+# Environment and configuration
+.env
+.env.*
+passwords
+
+# Documentation
+*.md
+!README.md
+
+# Data directories
+data/
+obsidian-mcp/
+
+# Development files
+ui/node_modules/
+ui/dist/
+ui/.vite/
+
+# Docker
+docker-compose.yml
+mediamtx.yml
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

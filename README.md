@@ -1,5 +1,3 @@
-# tapes - Home Security Camera Recording System
-
 I've been tinkering with IP cameras at home for years. What started as a single camera monitoring the driveway turned into a multi-camera system, and with it came the realization that commercial solutions were either too expensive, too limited, or required subscriptions that felt unnecessary. I wanted something simple: capture video from my cameras continuously, store it efficiently, and make it available for whatever I needed—whether that was viewing in HomeKit, running AI detection, or just reviewing footage when the neighbor's cat set off the motion sensor again.
 
 tapes is the result of that journey. It's built around a straightforward idea: use proven open-source tools to capture RTSP streams from IP cameras, save continuous recordings in manageable interval files, and provide a foundation for everything else. The recordings become source material for AI-based event detection, live viewing through HomeKit, or simply browsing through footage when you need to see what happened last Tuesday afternoon.
@@ -12,9 +10,9 @@ Recent improvements have simplified the architecture significantly: MediaMTX now
 
 tapes is built on three core components that work together:
 
-- **MediaMTX**: Proxies your IP camera RTSP streams and handles native continuous recording (no FFmpeg needed)
-- **tapes web application**: Go backend with React frontend for browsing and viewing recordings
-- **Storage**: Simple file-based storage with automatic thumbnail generation and retention management
+- **mediamtx proxy**: Proxies your IP camera RTSP streams and handles native continuous recording
+- **web application**: Go backend with React frontend for browsing and viewing recordings and live video
+- **disk storage**: Simple file-based storage with automatic thumbnail generation and retention management
 
 Everything runs in Docker containers orchestrated by docker-compose for easy deployment and management.
 
@@ -22,11 +20,8 @@ Everything runs in Docker containers orchestrated by docker-compose for easy dep
 
 Before you begin, you'll need:
 
-- A Linux server (Ubuntu/Debian recommended)
-- Docker and docker-compose installed
+- A Linux server (Ubuntu/Debian recommended) with Docker
 - One or more IP cameras with RTSP streams
-- Basic command line familiarity
-- Camera stream URLs in format: `rtsp://user:password@ip:port/path`
 
 ## Setup and Install
 
@@ -35,17 +30,15 @@ Before you begin, you'll need:
 Create the directory structure for your camera recordings:
 
 ```bash
-sudo mkdir -p /data/cameras/{garage,kitchen,study}
-sudo chmod -R 755 /data/cameras
+sudo mkdir -p /path/to/cameras/{garage,kitchen}
 ```
 
-Replace `garage`, `kitchen`, and `study` with your actual camera names. The structure will look like:
+Replace `garage` and `kitchen` with your actual camera names. The structure will look like:
 
 ```
-/data/cameras/
-├── garage/             # Video files go directly here
-├── kitchen/
-└── study/
+/path/to/cameras/
+├── garage/
+└── kitchen/
 ```
 
 MediaMTX will create video files directly in each camera directory—no subdirectories needed.
@@ -73,8 +66,8 @@ Edit the `.env` file with your settings:
 JWT_KEY=your-secret-key-here              # Generate with: openssl rand -hex 32
 
 # Optional (defaults shown)
-STORAGE_PATH=/data/cameras                # Path to camera recordings
-PASSWORDS_PATH=/opt/tapes/passwords       # Path to htpasswd file
+STORAGE_PATH=/path/to/cameras             # Path to camera recordings
+PASSWORDS_PATH=/path/to/passwords         # Path to htpasswd file
 JWT_ISSUER=tapes                          # JWT issuer identifier
 DEBUG=false                               # Enable debug logging (true/false)
 RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep forever)
@@ -87,6 +80,7 @@ RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep fo
 Create a password file for web interface access:
 
 ```bash
+cd /path/to
 htpasswd -c passwords admin        # Create file with first user
 htpasswd passwords viewer          # Add additional users
 ```
@@ -132,13 +126,22 @@ docker-compose ps
 docker-compose logs
 ```
 
-The web application will be available at `http://your-server:8671`.
+The web application will be available at `http://<server ip>:8671`.
 
-Verify recordings are being created by checking for video files in `/data/cameras/{camera}/`.
+#### Container Images
+
+By default, `docker-compose up` will pull the pre-built tapes image from GitHub Container Registry (ghcr.io). This image is automatically built on every push to main via GitHub Actions, saving you 10-15 minutes of build time with OpenCV.
+
+To build locally for development instead:
+
+```bash
+docker-compose build tapes
+docker-compose up -d
+```
 
 ## Using tapes
 
-Once running, open `http://your-server:8671` in your browser:
+Once running, open `http://<server ip>:8671` in your browser:
 
 1. **Login** with credentials from your htpasswd file
 2. **Select Camera** from the dropdown
@@ -154,7 +157,7 @@ The interface automatically generates thumbnails for all videos hourly. Recordin
 Monitor disk usage regularly:
 
 ```bash
-df -h /data/cameras
+df -h /path/to/cameras
 ```
 
 With 5-minute segments, storage usage depends on your bitrate. Typical cameras at 2-4 Mbps use roughly:
@@ -191,50 +194,6 @@ server {
 }
 ```
 
-## Troubleshooting
-
-### No video files appearing
-
-Check MediaMTX container is running and recording:
-
-```bash
-docker-compose ps
-docker-compose logs mediamtx
-```
-
-Verify camera URLs are correct and accessible from your server. Check that recordings are being created in `/data/cameras/{camera}/`.
-
-### Thumbnails not generating
-
-Check disk space and verify tapes has write permissions to camera directories. Thumbnails generate hourly automatically. Enable debug logging to see detailed thumbnail generation:
-
-```bash
-# In .env file
-DEBUG=true
-```
-
-Then check logs: `docker-compose logs tapes`
-
-### Can't login to web interface
-
-Verify htpasswd file exists and contains users:
-
-```bash
-cat passwords
-```
-
-Check JWT_KEY is set in `.env` file and is a secure random key (not a simple password).
-
-### Enable debug logging
-
-For detailed diagnostics, enable debug mode in `.env`:
-
-```bash
-DEBUG=true
-```
-
-This shows all request details, thumbnail generation, and processing information in the logs.
-
 ## Architecture Details
 
 ### File Naming Convention
@@ -264,11 +223,7 @@ tapes runs an hourly background task that:
 
 All processing is logged with structured output for easy monitoring.
 
-## Contributing
-
-See `CLAUDE.md` for development guidelines and architecture decisions.
-
-### Development
+## Development
 
 ```bash
 # Frontend development
@@ -280,7 +235,3 @@ cd api && go run .
 # Code formatting
 npm run lint && go fmt ./...
 ```
-
-## License
-
-[License to be determined]

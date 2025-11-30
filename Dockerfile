@@ -39,8 +39,8 @@ RUN ldconfig
 
 # create app user and directories
 RUN useradd -r -s /bin/false tapes && \
-    mkdir -p /opt/tapes /data/cameras && \
-    chown -R tapes:tapes /opt/tapes /data/cameras
+    mkdir -p /opt/tapes /cameras && \
+    chown -R tapes:tapes /opt/tapes /cameras
 
 # copy built application
 COPY --from=builder /app/api/tapes /opt/tapes/
