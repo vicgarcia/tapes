@@ -24,8 +24,8 @@ services:
     ports:
       - "8671:8671"
     volumes:
-      - ./data/cameras:/cameras
       - ./passwords:/opt/tapes/passwords:ro
+      - ./data/cameras:/cameras
     depends_on:
       - mediamtx
 
