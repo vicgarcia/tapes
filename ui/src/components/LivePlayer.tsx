@@ -1,7 +1,6 @@
 import { useState, useEffect, CSSProperties } from 'react'
 import ReactPlayer from 'react-player'
 import { Camera } from '@app/types';
-import { LiveBadge } from './LiveBadge';
 
 const styles = {
     container: {
@@ -66,8 +65,6 @@ export function LivePlayer({camera}: LivePlayerProps) {
     }, [camera]);
 
     return <div className='live-player position-relative mb-5' style={styles.container}>
-        <LiveBadge isPlaying={isPlaying} />
-
         {hasError && (
             <div className='position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-dark text-white' style={styles.errorOverlay}>
                 <div className='text-center p-4'>
