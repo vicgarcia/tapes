@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#212529"/>
+  <g transform="translate(256,256)">
+    <!-- Camera body -->
+    <rect x="-120" y="-60" width="240" height="120" rx="12" fill="#ffffff" opacity="0.9"/>
+    <!-- Lens -->
+    <circle cx="0" cy="0" r="50" fill="#6c757d"/>
+    <circle cx="0" cy="0" r="35" fill="#212529"/>
+    <circle cx="0" cy="0" r="20" fill="#dc3545" opacity="0.3"/>
+    <!-- Recording indicator -->
+    <circle cx="70" cy="-30" r="12" fill="#dc3545"/>
+    <!-- Lens reflection -->
+    <circle cx="-10" cy="-10" r="8" fill="#ffffff" opacity="0.6"/>
+  </g>
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#ffffff" text-anchor="middle">TAPES</text>
+</svg>
