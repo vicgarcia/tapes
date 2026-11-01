@@ -30,6 +30,8 @@ func main() {
 	r.HandleFunc("/auth", auth.ValidateAuth(handlers.AuthHandler)).Methods("GET")
 	r.HandleFunc("/cameras", auth.ValidateAuth(handlers.CamerasHandler)).Methods("GET")
 	r.HandleFunc("/cameras/{camera}", auth.ValidateAuth(handlers.CameraHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/recordings", auth.ValidateAuth(handlers.RecordingsHandler)).Methods("GET")
+	r.HandleFunc("/cameras/{camera}/playback", auth.ValidateAuth(handlers.PlaybackHandler)).Methods("GET", "HEAD")
 	r.PathPrefix("/cameras/{camera}/live/").Handler(auth.ValidateAuth(handlers.LiveStreamHandler)).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(sub)))
 	srv := &http.Server{Addr: ":8671", Handler: r}
