@@ -2,7 +2,7 @@
 set -euo pipefail
 docker run --rm -v "$PWD/ui:/src" -w /src node:20.19.5-slim sh -c 'npm ci && npm run build && npm run lint'
 docker run --rm -v "$PWD/ui:/src/ui" -v "$PWD/api:/src/api" -w /src/ui node:20.19.5-slim sh -c 'npm ci && npm run build'
-docker run --rm -v "$PWD/api:/src" -w /src golang:1.26-bookworm sh -c 'go vet ./... && go test ./...'
+docker run --rm -v "$PWD/api:/src" -w /src golang:1.26-bookworm sh -c 'go vet ./... && go test -race ./...'
 docker build -t tapes:test .
 compose=(docker compose -p tapes-test -f test/docker-compose.yml)
 export MEDIAMTX_PASS=test-only-password

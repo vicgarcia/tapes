@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/vicgarcia/tapes/internal/cameras"
 	"github.com/vicgarcia/tapes/internal/env"
 	"github.com/vicgarcia/tapes/internal/mediamtx"
 	"github.com/vicgarcia/tapes/internal/playback"
@@ -28,10 +29,14 @@ type span struct {
 
 // RecordingsHandler lists spans clipped to a window of at most seven days.
 func RecordingsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	start, e1 := time.Parse(time.RFC3339Nano, r.URL.Query().Get("start"))
 	end, e2 := time.Parse(time.RFC3339Nano, r.URL.Query().Get("end"))
 	if e1 != nil || e2 != nil || !end.After(start) || end.Sub(start) > 7*24*time.Hour {
 		jsonError(w, 400, "invalid recording window (maximum 7 days)")
+		return
+	}
+	if !recordingCamera(w, r) {
 		return
 	}
 	rows, err := mediamtx.ListRecordings(r.Context(), mux.Vars(r)["camera"], start, end)
@@ -52,7 +57,7 @@ func RecordingsHandler(w http.ResponseWriter, r *http.Request) {
 			b = end
 		}
 		if b.After(a) {
-			spans = append(spans, span{a.UTC().Format(timestampFormat), b.UTC().Format(timestampFormat), b.Sub(a).Seconds()})
+			spans = append(spans, span{a.UTC().Format(timestampFormat), b.UTC().Format(timestampFormat), math.Round(b.Sub(a).Seconds()*1000) / 1000})
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -77,15 +82,17 @@ func PlaybackHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid start or duration (1-600 seconds)")
 		return
 	}
+	if !recordingCamera(w, r) {
+		return
+	}
 	camera := mux.Vars(r)["camera"]
 	d := strconv.FormatFloat(duration, 'f', -1, 64)
-	ttl := clipLifetime(start, duration, time.Now())
 	// JSON encoding keeps camera names and times unambiguous in the cache key.
 	key, _ := json.Marshal([]string{mediamtx.PlaybackURL(), camera, start.UTC().Format(time.RFC3339Nano), d})
-	clip, err := clipCache().Get(r.Context(), string(key), ttl, func(ctx context.Context) (io.ReadCloser, error) { return mediamtx.ReadClip(ctx, camera, start, d) })
+	clip, err := clipCache().Get(r.Context(), string(key), start, duration, func(ctx context.Context) (io.ReadCloser, error) { return mediamtx.ReadClip(ctx, camera, start, d) })
 	if err != nil {
 		switch {
-		case errors.Is(err, mediamtx.ErrNoRecording):
+		case errors.Is(err, mediamtx.ErrNoRecording), errors.Is(err, playback.ErrEmpty):
 			jsonError(w, 404, "no recording at start")
 		case errors.Is(err, playback.ErrFull):
 			jsonError(w, 503, "playback cache full")
@@ -97,15 +104,27 @@ func PlaybackHandler(w http.ResponseWriter, r *http.Request) {
 	defer clip.Close()
 	w.Header().Set("Content-Type", "video/mp4")
 	w.Header().Set("X-Playback-Start", start.UTC().Format(timestampFormat))
-	w.Header().Set("X-Playback-Duration", d)
-	// Live-edge clips may change even when the URL is unchanged.
-	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "clip.mp4", time.Time{}, clip)
+	w.Header().Set("X-Playback-Duration", strconv.FormatFloat(clip.Duration(), 'f', 3, 64))
+	w.Header().Set("ETag", clip.ETag())
+	if clip.Growing() {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	} else {
+		w.Header().Set("Cache-Control", "private, max-age=3600")
+	}
+	http.ServeContent(w, r, "clip.mp4", clip.FetchedAt(), clip)
 }
 
-func clipLifetime(start time.Time, duration float64, now time.Time) time.Duration {
-	if !start.Add(time.Duration(duration * float64(time.Second))).Before(now.Add(-10 * time.Second)) {
-		return 15 * time.Second
+func recordingCamera(w http.ResponseWriter, r *http.Request) bool {
+	all, err := cameras.GetAll()
+	if err != nil {
+		jsonError(w, 502, "mediamtx unavailable")
+		return false
 	}
-	return time.Hour
+	for _, camera := range all {
+		if camera.Name == mux.Vars(r)["camera"] {
+			return true
+		}
+	}
+	jsonError(w, 404, "camera not found")
+	return false
 }
