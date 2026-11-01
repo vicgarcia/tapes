@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import App from '@app/components/App';
 
-import './main.scss'
-import 'bootstrap-icons/font/bootstrap-icons.css';
+import './styles/base.css';
+import './styles/shell.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<App />);

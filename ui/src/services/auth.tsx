@@ -1,65 +1,85 @@
-import axios from "axios";
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
-import { Navigate, useLocation } from 'react-router-dom';
+// Auth context, hooks and route guards live together as the auth "service".
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ApiError, request } from './base';
 
-export type AuthProviderType = {
-  isAuthenticated: boolean
-  login: (username: string, password: string) => Promise<void>
-  logout: () => Promise<void>
+export type AuthStatus = 'checking' | 'authenticated' | 'anonymous';
+
+export type AuthContextType = {
+    status: AuthStatus
+    login: (username: string, password: string) => Promise<void>
+    logout: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthProviderType|undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [status, setStatus] = useState<AuthStatus>('checking');
 
-  useEffect(() => {
-    axios.get('/auth')
-      .then(() => setIsAuthenticated(true));
-  }, []);
+    useEffect(() => {
+        const controller = new AbortController();
+        request('/auth', { signal: controller.signal })
+            .then(() => { if (!controller.signal.aborted) setStatus('authenticated'); })
+            .catch(() => { if (!controller.signal.aborted) setStatus('anonymous'); });
 
-  const login = async (username: string, password: string) => {
-    const payload = new URLSearchParams();
-    payload.append('username', username);
-    payload.append('password', password);
+        // any API call answering 401 ends the session
+        const onUnauthorized = () => setStatus('anonymous');
+        window.addEventListener('unauthorized', onUnauthorized);
+        return () => {
+            controller.abort();
+            window.removeEventListener('unauthorized', onUnauthorized);
+        };
+    }, []);
 
-    return axios.post('/login', payload)
-      .then(() => {
-        setIsAuthenticated(true);
-      });
-  };
+    const login = useCallback(async (username: string, password: string) => {
+        const body = new URLSearchParams({ username, password });
+        await request('/login', { method: 'POST', body });
+        setStatus('authenticated');
+    }, []);
 
-  const logout = async () => {
-    return axios.post('/logout')
-      .then(() => {
-        setIsAuthenticated(false);
-      })
-  }
+    const logout = useCallback(async () => {
+        try {
+            await request('/logout', { method: 'POST' });
+        } finally {
+            setStatus('anonymous');
+        }
+    }, []);
 
-  // Provide the authentication context to the children components
-  return <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
-    {children}
-  </AuthContext.Provider>
-};
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = (): AuthProviderType => {
-  return useContext(AuthContext) as AuthProviderType;
-};
-
-export type RequireAuthProps = {
-  children: JSX.Element
+    return <AuthContext.Provider value={{ status, login, logout }}>
+        {children}
+    </AuthContext.Provider>;
 }
 
-export function RequireAuth({ children }: RequireAuthProps) {
-  const auth = useAuth();
-  const location = useLocation();
-  if (auth.isAuthenticated !== true) return <Navigate to="/login" state={{ from: location }} />;
-  return children;
+export function useAuth(): AuthContextType {
+    const context = useContext(AuthContext);
+    if (!context) throw new Error('useAuth outside AuthProvider');
+    return context;
+}
+
+export function isBadCredentials(error: unknown): boolean {
+    return error instanceof ApiError && error.status === 401;
+}
+
+export function RequireAuth({ children }: { children: JSX.Element }) {
+    const { status } = useAuth();
+    const location = useLocation();
+    if (status === 'checking') return null;
+    if (status !== 'authenticated') return <Navigate to="/login" replace state={{ from: location }} />;
+    return children;
 }
 
 export function Logout() {
-  const auth = useAuth();
-  auth.logout();
-  return <Navigate to="/login" />
+    const auth = useAuth();
+    const navigate = useNavigate();
+    const called = useRef(false);
+
+    useEffect(() => {
+        if (called.current) return;
+        called.current = true;
+        const finish = () => navigate('/login', { replace: true });
+        void auth.logout().then(finish, finish);
+    }, [auth, navigate]);
+
+    return null;
 }

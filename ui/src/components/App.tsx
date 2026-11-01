@@ -1,18 +1,43 @@
-import { HashRouter, Routes, Navigate } from "react-router-dom";
-import { Route } from "react-router-dom";
-import { AuthProvider, RequireAuth, Logout } from "@app/services/auth";
-import { Login } from "@app/components/Login";
-import { Dashboard } from "@app/components/Dashboard";
+import { lazy, Suspense } from 'react';
+import { HashRouter, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
+import { AuthProvider, RequireAuth, Logout } from '@app/services/auth';
+import { useServerStatus } from '@app/hooks/useServerStatus';
+import { Login } from './Login';
+import { Offline } from './Offline';
+import { Icon } from './common/Icon';
+
+const CameraView = lazy(() => import('./player/CameraView'));
 
 export default function App() {
+    const { isServerReachable, retry } = useServerStatus();
+    if (isServerReachable === null) return null;
+    if (!isServerReachable) return <Offline onRetry={retry} />;
+
     return <HashRouter>
         <AuthProvider>
             <Routes>
                 <Route path="/login" element={<Login />} />
-                <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
                 <Route path="/logout" element={<Logout />} />
-                <Route path="*" element={<Navigate to="/login" />} />
+                <Route element={<RequireAuth><Shell /></RequireAuth>}>
+                    <Route path="/" element={<main className="page"><h1>Cameras</h1><p>Camera home is coming next.</p></main>} />
+                </Route>
+                <Route path="/cameras/:name" element={<RequireAuth><Suspense fallback={<main className="fullscreen-state"><div className="spinner" /></main>}><CameraView /></Suspense></RequireAuth>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </AuthProvider>
-    </HashRouter>
+    </HashRouter>;
+}
+
+function Shell() {
+    return <div className="shell">
+        <header className="topbar">
+            <div className="topbar-inner">
+                <span className="brand">TAPES</span>
+                <Link to="/logout" className="btn-icon topbar-logout" aria-label="Sign out" title="Sign out">
+                    <Icon name="logout" size={20} />
+                </Link>
+            </div>
+        </header>
+        <Outlet />
+    </div>;
 }

@@ -13,7 +13,7 @@ COPY api/go.mod api/go.sum ./api/
 WORKDIR /app/api
 RUN go mod download
 COPY api/ ./
-COPY --from=node /app/api/dist ./dist
+COPY --from=node /app/ui/dist ./dist
 RUN CGO_ENABLED=0 go build -o /tapes .
 
 FROM alpine:3.21

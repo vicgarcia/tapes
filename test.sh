@@ -102,8 +102,10 @@ ui() {
   cd /src/ui
 
   check "UI dependencies" exit "exit 0" npm ci
-  check "UI build into api/dist" exit "exit 0" npm run build
+  check "UI build" exit "exit 0" npm run build
+  cp -a dist /src/api/dist
   check "UI lint" exit "exit 0" npm run lint
+  check "UI service tests" exit "exit 0" npm test
  '
 }
 
