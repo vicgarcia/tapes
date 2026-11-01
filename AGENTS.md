@@ -32,7 +32,7 @@ Tapes is a camera-recording application with a Go backend in `api/`, a React/Typ
 
 ## Testing and review
 - Add or update tests for behavior changes and edge cases. Keep tests deterministic and isolated; rely on external services only when the repository's integration setup provides them.
-- Go sources are under `api/`. Use the repository's `factory-test` workflow for tests; do not run project tests directly outside that workflow.
+- Go sources are under `api/`. Use `factory-test ui`, `factory-test api`, or `factory-test stack` while working, and the full `factory-test` run before pushing. These forward to `./test.sh [ui|api|stack]`; no argument runs everything. Do not run project tests directly outside that workflow.
 - Review `git diff` for correctness, scope, formatting, and stale comments before committing. Avoid generated files or unrelated formatting changes unless required.
 
 ## Repository map
