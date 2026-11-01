@@ -22,9 +22,12 @@ type Camera struct {
 	Video  *Video `json:"video"`
 }
 
-var mu sync.Mutex
-var cache []Camera
-var cached time.Time
+// Cache MediaMTX camera paths briefly to reduce control API requests.
+var (
+	mu     sync.Mutex
+	cache  []Camera
+	cached time.Time
+)
 
 // GetAll returns cameras reported by MediaMTX, sorted by name.
 func GetAll() ([]Camera, error) {
