@@ -16,7 +16,6 @@ import (
 var static embed.FS
 
 // main starts the HTTP server.
-// main starts the HTTP server.
 func main() {
 	if strings.TrimSpace(os.Getenv("JWT_KEY")) == "" {
 		log.Fatal("JWT_KEY is required")

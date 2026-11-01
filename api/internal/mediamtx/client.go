@@ -10,7 +10,6 @@ import (
 )
 
 // Track describes a MediaMTX video track.
-// Track describes a MediaMTX video track.
 type Track struct {
 	Codec      string `json:"codec"`
 	CodecProps *struct {
@@ -20,7 +19,6 @@ type Track struct {
 }
 
 // Path describes a MediaMTX path returned by the control API.
-// Path describes a MediaMTX path returned by the control API.
 type Path struct {
 	Name   string  `json:"name"`
 	Ready  bool    `json:"ready"`
@@ -28,10 +26,8 @@ type Path struct {
 }
 
 // base returns a configured MediaMTX URL without a trailing slash.
-// base returns a configured MediaMTX URL without a trailing slash.
 func base(key, def string) string { return strings.TrimRight(env.GetWithDefault(key, def), "/") }
 
-// Paths returns the paths reported by the MediaMTX control API.
 // Paths returns the paths reported by the MediaMTX control API.
 func Paths() ([]Path, error) {
 	u := base("MEDIAMTX_API_URL", "http://mediamtx:9997") + "/v3/paths/list"
@@ -55,7 +51,6 @@ func Paths() ([]Path, error) {
 }
 
 // HLSURL builds a MediaMTX HLS URL for a camera path and query.
-// HLSURL builds a MediaMTX HLS URL for a camera path and query.
 func HLSURL(camera, path string, q url.Values) string {
 	u := base("MEDIAMTX_HLS_URL", "http://mediamtx:8888") + "/" + camera + "/" + path
 	if len(q) > 0 {
@@ -65,12 +60,10 @@ func HLSURL(camera, path string, q url.Values) string {
 }
 
 // HLSHost returns the configured MediaMTX HLS host.
-// HLSHost returns the configured MediaMTX HLS host.
 func HLSHost() string {
 	u, _ := url.Parse(base("MEDIAMTX_HLS_URL", "http://mediamtx:8888"))
 	return u.Host
 }
 
-// PlaybackURL returns the configured MediaMTX playback URL.
 // PlaybackURL returns the configured MediaMTX playback URL.
 func PlaybackURL() string { return base("MEDIAMTX_PLAYBACK_URL", "http://mediamtx:9996") }

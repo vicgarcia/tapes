@@ -9,14 +9,12 @@ import (
 )
 
 // Video describes a camera's video track.
-// Video describes a camera's video track.
 type Video struct {
 	Codec  string `json:"codec"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
 }
 
-// Camera describes a camera and its current stream status.
 // Camera describes a camera and its current stream status.
 type Camera struct {
 	Name   string `json:"name"`
@@ -28,7 +26,6 @@ var mu sync.Mutex
 var cache []Camera
 var cached time.Time
 
-// GetAll returns cameras reported by MediaMTX, sorted by name.
 // GetAll returns cameras reported by MediaMTX, sorted by name.
 func GetAll() ([]Camera, error) {
 	mu.Lock()
@@ -57,7 +54,6 @@ func GetAll() ([]Camera, error) {
 	return append([]Camera(nil), out...), nil
 }
 
-// GetByName returns the camera with the given name.
 // GetByName returns the camera with the given name.
 func GetByName(name string) (Camera, error) {
 	all, e := GetAll()
