@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vicgarcia/tapes/internal/playback"
-
 	"github.com/gorilla/mux"
+
+	"github.com/vicgarcia/tapes/internal/playback"
 )
 
 func recordingRequest(handler http.HandlerFunc, method, query string) *httptest.ResponseRecorder {

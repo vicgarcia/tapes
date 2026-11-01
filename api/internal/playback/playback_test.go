@@ -155,3 +155,40 @@ func TestCacheHitAndCancellationDuringDownload(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExpiredActiveClipRemainsAccounted(t *testing.T) {
+	c := New(2 * chunkSize)
+	old, err := c.Get(context.Background(), "a", time.Hour, source("old"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.entries["a"].expires = time.Now().Add(-time.Second)
+	fresh, err := c.Get(context.Background(), "a", time.Hour, source("new"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.allocated != 2*chunkSize {
+		t.Fatal(c.allocated)
+	}
+	for _, tc := range []struct {
+		clip *Clip
+		want string
+	}{{old, "old"}, {fresh, "new"}} {
+		data, err := io.ReadAll(tc.clip)
+		if err != nil || string(data) != tc.want {
+			t.Fatalf("%q %v", data, err)
+		}
+	}
+	old.Close()
+	fresh.Close()
+	if c.allocated != chunkSize {
+		t.Fatal(c.allocated)
+	}
+}
+func TestEmptyClipIsNotCached(t *testing.T) {
+	c := New(chunkSize)
+	_, err := c.Get(context.Background(), "empty", time.Hour, source(""))
+	if !errors.Is(err, io.ErrUnexpectedEOF) || len(c.entries) != 0 || c.allocated != 0 {
+		t.Fatalf("%v %d", err, c.allocated)
+	}
+}

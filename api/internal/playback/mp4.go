@@ -19,6 +19,7 @@ type entry struct {
 	size, allocated int64
 	expires, used   time.Time
 	refs            int
+	retired         bool
 }
 
 // Cache bounds clip storage, including clips still being served or downloaded.
@@ -45,7 +46,14 @@ type Clip struct {
 
 // Close releases this reader's reference to the clip.
 func (c *Clip) Close() error {
-	c.once.Do(func() { c.cache.mu.Lock(); defer c.cache.mu.Unlock(); c.entry.refs-- })
+	c.once.Do(func() {
+		c.cache.mu.Lock()
+		defer c.cache.mu.Unlock()
+		c.entry.refs--
+		if c.entry.refs == 0 && c.entry.retired {
+			c.cache.allocated -= c.entry.allocated
+		}
+	})
 	return nil
 }
 
@@ -69,7 +77,13 @@ func (r chunkReader) ReadAt(p []byte, off int64) (int, error) {
 	return n, nil
 }
 
-func (c *Cache) remove(key string, e *entry) { delete(c.entries, key); c.allocated -= e.allocated }
+func (c *Cache) remove(key string, e *entry) {
+	delete(c.entries, key)
+	e.retired = true
+	if e.refs == 0 {
+		c.allocated -= e.allocated
+	}
+}
 func (c *Cache) room(bytes int64) bool {
 	for c.allocated+bytes > c.limit {
 		var oldest *entry
@@ -111,7 +125,7 @@ func (c *Cache) Get(ctx context.Context, key string, ttl time.Duration, open fun
 	c.mu.Lock()
 	now := time.Now()
 	for k, e := range c.entries {
-		if !now.Before(e.expires) && e.refs == 0 {
+		if !now.Before(e.expires) {
 			c.remove(k, e)
 		}
 	}
@@ -119,10 +133,6 @@ func (c *Cache) Get(ctx context.Context, key string, ttl time.Duration, open fun
 		clip := c.reader(e)
 		c.mu.Unlock()
 		return clip, nil
-	}
-	if c.entries[key] != nil {
-		c.mu.Unlock()
-		return nil, ErrFull
 	}
 	c.mu.Unlock()
 	body, err := open(ctx)
@@ -176,6 +186,10 @@ func (c *Cache) Get(ctx context.Context, key string, ttl time.Duration, open fun
 		if err != nil {
 			return nil, err
 		}
+	}
+	if e.size == 0 {
+		err = io.ErrUnexpectedEOF
+		return nil, err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
