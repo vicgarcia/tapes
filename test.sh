@@ -32,6 +32,30 @@ for _ in $(seq 1 90); do
 done
 test "$ready" = true
 
+# Migrate a completed recording and verify playback/listing recognize the legacy timestamp.
+recording=$(docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c 'find /recordings/test -type f -name "*.mp4" | sort | head -n 1 | sed "s|/recordings/test/||"')
+test -n "$recording"
+legacy_timestamp=$(date -u -d '2020-01-02 03:04:05' +%Y%m%d%H%M%S)
+docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "mv /recordings/test/'$recording' /recordings/test/'$legacy_timestamp'.mp4; touch /recordings/test/'$legacy_timestamp'.jpg"
+# Use the repository script against a temporary host copy of the recordings volume.
+migration_output=$(docker run --rm -v tapes-test-recordings:/recordings -v "$PWD/scripts:/scripts:ro" -e TZ=UTC alpine:3.21 sh -c 'apk add --no-cache bash coreutils >/dev/null && bash /scripts/migrate-recordings.sh /recordings')
+printf '%s' "$migration_output" | grep -q 'Files moved: 1'
+recording_stamp=$(docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "basename /recordings/test/'$legacy_timestamp'-000000+0000.mp4 .mp4")
+recording_start=$(date -u -d "${recording_stamp:0:4}-${recording_stamp:4:2}-${recording_stamp:6:2} ${recording_stamp:8:2}:${recording_stamp:10:2}:${recording_stamp:12:2}" +%Y-%m-%dT%H:%M:%SZ)
+list_response=$(curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" "http://mediamtx:9996/list?path=test&start=$recording_start")
+node -e 'const rows=JSON.parse(process.argv[1]);if(!rows.some(r=>r.start===process.argv[2]))process.exit(1)' "$list_response" "$recording_start"
+playback_url=$(node -e 'process.stdout.write(JSON.parse(process.argv[1])[0].url)' "$list_response")
+curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" -o /dev/null "$playback_url"
+docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "test ! -e /recordings/test/'$legacy_timestamp'.jpg"
+# The migration is idempotent, and dry-run leaves a fresh legacy recording untouched.
+second=$(docker run --rm -v tapes-test-recordings:/recordings -v "$PWD/scripts:/scripts:ro" -e TZ=UTC alpine:3.21 sh -c 'apk add --no-cache bash coreutils >/dev/null && bash /scripts/migrate-recordings.sh /recordings')
+printf '%s' "$second" | grep -q 'Files moved: 0'
+dry_timestamp=$(date -u -d '2020-02-03 04:05:06' +%Y%m%d%H%M%S)
+docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "cp /recordings/test/'$legacy_timestamp'-000000+0000.mp4 /recordings/test/'$dry_timestamp'.mp4"
+dry_result=$(docker run --rm -v tapes-test-recordings:/recordings -v "$PWD/scripts:/scripts:ro" -e TZ=UTC -e DRY_RUN=1 alpine:3.21 sh -c 'apk add --no-cache bash coreutils >/dev/null && bash /scripts/migrate-recordings.sh /recordings')
+printf '%s' "$dry_result" | grep -q 'Files moved: 0'
+docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "test -e /recordings/test/'$dry_timestamp'.mp4 && test ! -e /recordings/test/'$dry_timestamp'-000000+0000.mp4"
+
 test "$(curl_stack -o /dev/null -w '%{http_code}' -u "tapes:${MEDIAMTX_PASS}" 'http://mediamtx:9996/list?path=test')" = 200
 test "$(curl_stack -o /dev/null -w '%{http_code}' -u 'tapes:wrong-password' 'http://mediamtx:9996/list?path=test')" = 401
 test "$(curl_stack -o /dev/null -w '%{http_code}' 'http://mediamtx:9996/list?path=test')" = 401
