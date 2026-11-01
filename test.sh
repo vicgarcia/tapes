@@ -130,6 +130,8 @@ api() {
 build_image() {
  image_created=true
  check 'Production image build' exit 'exit 0' docker build -t "$image" .
+ printf 'Final image size (bytes): '
+ docker image inspect --format '{{.Size}}' "$image"
 }
 
 # Send requests from inside the Compose network, without publishing host ports.
@@ -179,6 +181,15 @@ wait_recorded() {
  echo false
 }
 
+# Decode the snapshot rather than accepting an image header or JPEG magic alone.
+check_snapshot() {
+ api_auth -fsS -D /dev/stderr -w '%{stderr}Snapshot grab HTTP time: %{time_total}s\n' http://tapes:8671/cameras/test/snapshot >"$scratch/snapshot.jpg" 2>"$scratch/snapshot-headers" || return
+ grep -Eqi '^Content-Type: image/jpeg' "$scratch/snapshot-headers" || return
+ grep -Eqi '^Cache-Control: no-store' "$scratch/snapshot-headers" || return
+ grep -Eqi '^X-Snapshot-Time: .+' "$scratch/snapshot-headers" || return
+ "${compose[@]}" run --rm -T --no-deps publisher -hide_banner -loglevel error -i pipe:0 -frames:v 1 -f null - <"$scratch/snapshot.jpg"
+}
+
 # Check public health, authentication, live video, and recorded playback end to end.
 stack() {
  stack_started=true
@@ -188,7 +199,7 @@ stack() {
  check 'Health' equal 200 curl_stack -o /dev/null -w '%{http_code}' http://tapes:8671/health
 
  # Every protected route must reject requests without a cookie.
- for path in /auth /logout /cameras /cameras/nope /cameras/test/live/index.m3u8 /cameras/test/recordings /cameras/test/playback; do
+ for path in /auth /logout /cameras /cameras/nope /cameras/test/live/index.m3u8 /cameras/test/recordings /cameras/test/playback /cameras/test/snapshot; do
   method=GET; [[ "$path" == /logout ]] && method=POST
   check "Unauthenticated $method $path" equal 401 curl_stack -X "$method" -o /dev/null -w '%{http_code}' "http://tapes:8671$path"
  done
@@ -199,6 +210,9 @@ stack() {
  check 'Camera name' contains '"name":"test"' api_auth -fsS http://tapes:8671/cameras
  check 'Camera width' contains '"width":640' api_auth -fsS http://tapes:8671/cameras
  check 'Missing camera' equal 404 api_auth -o /dev/null -w '%{http_code}' http://tapes:8671/cameras/nope
+ check 'Snapshot JPEG and headers' exit 'exit 0' check_snapshot
+ grep '^Snapshot grab HTTP time:' "$scratch/snapshot-headers"
+ check 'Missing camera snapshot' equal 404 api_auth -o /dev/null -w '%{http_code}' http://tapes:8671/cameras/nope/snapshot
  check 'Live HLS playlist' contains '#EXTM3U' api_auth -fsS http://tapes:8671/cameras/test/live/index.m3u8
 
  # Verify seekable playback and recording-window error responses.

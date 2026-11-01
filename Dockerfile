@@ -17,7 +17,7 @@ COPY --from=node /app/api/dist ./dist
 RUN CGO_ENABLED=0 go build -o /tapes .
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates && adduser -D -u 1000 tapes
+RUN apk add --no-cache ca-certificates ffmpeg && adduser -D -u 1000 tapes
 COPY --from=golang /tapes /opt/tapes/tapes
 USER 1000
 EXPOSE 8671

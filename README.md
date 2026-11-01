@@ -238,6 +238,16 @@ All endpoints require JWT authentication:
 - `GET /cameras/{camera}/recordings/{timestamp}/video` - Stream recording
 - `GET /cameras/{camera}/recordings/{timestamp}/thumbnail` - Get thumbnail
 
+### Camera snapshots
+
+Authenticated `GET /cameras/{camera}/snapshot` returns a JPEG with `Cache-Control: no-store`
+and an RFC3339 `X-Snapshot-Time`. Unknown cameras and cameras without a captured frame
+return 404. Snapshots are grabbed only on request from `MEDIAMTX_RTSP_URL`
+(default `rtsp://mediamtx:8554`) using ffmpeg. Results, including failures, are cached
+for five seconds; requests share a grab per camera, with at most two grabs running.
+Grabs time out after ten seconds. A failed refresh serves the last good in-memory
+frame with its original timestamp. No snapshot files are written.
+
 ### Background Processing
 
 tapes runs an hourly background task that:
