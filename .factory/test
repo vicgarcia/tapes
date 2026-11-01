@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The factory runs this for each commit. test.sh holds the checks, and needs no credentials or cameras.
+set -euo pipefail
+exec ./test.sh

@@ -1,0 +1,30 @@
+# Added by ./factory init. GitHub doesn't notify you about your own account's activity, and the agents act as you,
+# so this mentions you as github-actions[bot] when a PR goes ready or the factory needs you. The factory ignores comments
+# from other accounts, so these don't wake a session.
+name: factory-notify
+on:
+  pull_request:
+    types: [ready_for_review, labeled]
+  issues:
+    types: [labeled]
+permissions:
+  issues: write
+  pull-requests: write
+jobs:
+  notify:
+    if: github.event.action == 'ready_for_review' || github.event.label.name == 'factory:needs-human'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          if [ "$ACTION" = ready_for_review ]; then
+            message="@$OWNER PR ready for review"
+          else
+            message="@$OWNER intervention needed"
+          fi
+          gh api "repos/$REPO/issues/$NUMBER/comments" -f body="$message"

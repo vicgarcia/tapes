@@ -1,0 +1,27 @@
+# Runs this repo's factory. Build the image first, from the software-factory repo: ./factory build
+name: tapes-factory
+services:
+  factory:
+    image: software-factory:local
+    # The one line a host changes to use another isolation option.
+    privileged: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    env_file: .env
+    # environment:
+    #   - PI_MODEL=openai-codex/<model>
+    volumes:
+      # This clone. Agents work in worktrees under .worktrees/.
+      - ..:/workspace
+      # The factory's databases and logs, git-ignored.
+      - ./state:/state
+      # The Pi login, shared by every repo on this machine.
+      - factory-auth:/auth
+      # A named volume, because a Windows bind can't back the overlay driver.
+      - docker-data:/var/lib/docker
+volumes:
+  # Created by ./factory login. External, so `down -v` can't delete it.
+  factory-auth:
+    external: true
+    name: software-factory-auth
+  docker-data:
