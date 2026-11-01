@@ -1,29 +1,40 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+
+# Resolve paths from the repository root, even when invoked elsewhere.
 cd "$(dirname "$0")"
 source test/checks.sh
+
+# Validate the stage before creating any test resources.
 stage=${1:-all}
 if (( $# > 1 )) || [[ ! "$stage" =~ ^(all|ui|api|stack)$ ]]; then
  echo 'Usage: ./test.sh [ui|api|stack]' >&2
  exit 2
 fi
+
+# Keep timing and disposable resources scoped to this run.
 started=$SECONDS
 step=setup
 step_started=$SECONDS
 scratch=$(mktemp -d)
 export TMPDIR="$scratch"
+
 project="tapes-test-$$"
 workspace="$project-workspace"
 image="tapes-test:$$"
 compose=(docker compose --ansi never -p "$project" -f test/docker-compose.yml)
 export MEDIAMTX_PASS=test-only-password TAPES_TEST_IMAGE="$image"
+
 volume_created=false
 image_created=false
 stack_started=false
 container="$project-worker"
+
+# Collect failure evidence before removing resources; preserve the original exit status.
 cleanup() {
  local status=$?
  trap - EXIT ERR
+
  if (( status != 0 )); then
   printf 'FAIL in step: %s\n' "$step" >&2
   if [[ "$stack_started" == true ]]; then
@@ -36,6 +47,7 @@ cleanup() {
   step=teardown
   step_started=$SECONDS
  fi
+
  local cleanup_status=0
  docker rm -f "$container" >/dev/null 2>&1 || true
  if [[ "$stack_started" == true ]]; then
@@ -48,6 +60,7 @@ cleanup() {
   docker image rm "$image" >/dev/null || cleanup_status=$?
  fi
  rm -rf "$scratch"
+
  if (( status == 0 && cleanup_status != 0 )); then
   echo 'FAIL in step: teardown' >&2
   status=$cleanup_status
@@ -58,6 +71,8 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+# Track the active step so failures outside assertions still have a useful name.
 run_step() {
  step=$1
  shift
@@ -68,46 +83,62 @@ run_step() {
  step=teardown
  step_started=$SECONDS
 }
+
+# Share build output between UI and Go without writing generated files to the worktree.
 create_workspace() {
  docker volume create "$workspace" >/dev/null
  volume_created=true
 }
+
+# Install, build, and lint in one container using the disposable workspace.
 ui() {
  docker run --rm --name "$container" -v "$PWD:/repo:ro" -v "$workspace:/src" -w /src node:20.19.5-slim bash -euc '
   source /repo/test/checks.sh
   check "Assertion helper tests" exit "exit 0" bash /repo/test/checks-test.sh
+
   mkdir /src/ui
   tar -C /repo/ui --exclude=node_modules --exclude=dist --exclude="*.tsbuildinfo" -cf - . | tar -C /src/ui -xf -
   mkdir -p /src/api
   cd /src/ui
+
   check "UI dependencies" exit "exit 0" npm ci
   check "UI build into api/dist" exit "exit 0" npm run build
   check "UI lint" exit "exit 0" npm run lint
  '
 }
+
+# Run the backend checks with either the shared UI build or an embed fixture.
 api() {
  docker run --rm --name "$container" -v "$PWD:/repo:ro" -v "$workspace:/src" -w /src golang:1.26-bookworm bash -euc '
   source /repo/test/checks.sh
   check "Assertion helper tests" exit "exit 0" bash /repo/test/checks-test.sh
   cp -a /repo/api /src/
+
   # Go unit tests need an embed input, not a UI build. The full run uses the built UI.
   if [ ! -d /src/api/dist ]; then
    mkdir /src/api/dist
    cp /repo/test/embed.html /src/api/dist/index.html
   fi
+
   cd /src/api
   check "Go vet" exit "exit 0" go vet ./...
   check "Go race tests" exit "exit 0" go test -race ./...
  '
 }
+
+# Exercise the production Dockerfile independently of the unit-test workspace.
 build_image() {
  image_created=true
  check 'Production image build' exit 'exit 0' docker build -t "$image" .
 }
+
+# Send requests from inside the Compose network, without publishing host ports.
 curl_stack() {
  "${compose[@]}" run --rm -T --no-deps --entrypoint curl curl --silent --show-error "$@"
 }
 api_auth() { curl_stack -H "Cookie: tapes=$login_cookie" "$@"; }
+
+# Wait for the synthetic stream before probing the API.
 wait_ready() {
  local attempt output
  for ((attempt=0; attempt<90; attempt++)); do
@@ -118,11 +149,15 @@ wait_ready() {
  echo "${output:-No readiness response}" >&2
  echo false
 }
+
+# Retain the cookie for authenticated checks while exposing it to the login assertion.
 login() {
  curl_stack -D - -o /dev/null -d 'username=test&password=test' http://tapes:8671/login |
   awk 'BEGIN{IGNORECASE=1}/^Set-Cookie: tapes=/{sub("^Set-Cookie: tapes=","");sub(";.*","");print;exit}' | tr -d '\r' >"$scratch/cookie" || return
  cat "$scratch/cookie"
 }
+
+# Completed recording parts are required before playback can satisfy a Range request.
 wait_recorded() {
  local attempt spans code
  for ((attempt=0; attempt<60; attempt++)); do
@@ -143,21 +178,30 @@ wait_recorded() {
  printf 'Last spans: %s; playback status: %s\n' "$spans" "${code:-not requested}" >&2
  echo false
 }
+
+# Check public health, authentication, live video, and recorded playback end to end.
 stack() {
  stack_started=true
  "${compose[@]}" up -d
+
  check 'MediaMTX stream ready' equal true wait_ready
  check 'Health' equal 200 curl_stack -o /dev/null -w '%{http_code}' http://tapes:8671/health
+
+ # Every protected route must reject requests without a cookie.
  for path in /auth /logout /cameras /cameras/nope /cameras/test/live/index.m3u8 /cameras/test/recordings /cameras/test/playback; do
   method=GET; [[ "$path" == /logout ]] && method=POST
   check "Unauthenticated $method $path" equal 401 curl_stack -X "$method" -o /dev/null -w '%{http_code}' "http://tapes:8671$path"
  done
+
+ # Authenticate once for camera discovery and live HLS checks.
  check 'Login cookie' nonempty 'nonempty tapes cookie' login
  login_cookie=$(cat "$scratch/cookie")
  check 'Camera name' contains '"name":"test"' api_auth -fsS http://tapes:8671/cameras
  check 'Camera width' contains '"width":640' api_auth -fsS http://tapes:8671/cameras
  check 'Missing camera' equal 404 api_auth -o /dev/null -w '%{http_code}' http://tapes:8671/cameras/nope
  check 'Live HLS playlist' contains '#EXTM3U' api_auth -fsS http://tapes:8671/cameras/test/live/index.m3u8
+
+ # Verify seekable playback and recording-window error responses.
  check 'Recording spans and playback Range status' equal true wait_recorded
  start=$(cat "$scratch/playback-start")
  check 'Playback Accept-Ranges' icontains '^Accept-Ranges: bytes' api_auth -D - -o /dev/null -H 'Range: bytes=0-31' "http://tapes:8671/cameras/test/playback?start=$start&duration=5"
@@ -165,6 +209,8 @@ stack() {
  check 'Playback with no recording' equal 404 api_auth -o /dev/null -w '%{http_code}' 'http://tapes:8671/cameras/test/playback?start=2000-01-01T00:00:00Z&duration=5'
  check 'Recording window over seven days' equal 400 api_auth -o /dev/null -w '%{http_code}' 'http://tapes:8671/cameras/test/recordings?start=2000-01-01T00:00:00Z&end=2000-01-09T00:00:00Z'
 }
+
+# Run only the requested stage; stack always builds its own production image.
 if [[ "$stage" == all || "$stage" == ui || "$stage" == api ]]; then
  run_step setup create_workspace
 fi
