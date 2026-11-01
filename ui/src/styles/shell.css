@@ -1,0 +1,51 @@
+/* App shell, page layout and login. */
+
+.shell { min-height: 100vh; min-height: 100dvh; }
+
+.topbar {
+    position: sticky; top: 0; z-index: 20;
+    height: calc(56px + var(--safe-top)); padding-top: var(--safe-top);
+    background: rgba(10, 12, 15, 0.86); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+}
+/* same column and gutters as .page so the header lines up with the content */
+.topbar-inner {
+    display: flex; align-items: center; gap: 24px; height: 100%;
+    max-width: 1320px; margin: 0 auto;
+    padding: 0 max(24px, var(--safe-right)) 0 max(24px, var(--safe-left));
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.brand-mark {
+    display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(140deg, #2b5fae, #5b9dff); color: #fff;
+}
+.topbar-logout { margin-left: auto; color: var(--text-2); }
+
+.page {
+    max-width: 1320px; margin: 0 auto;
+    padding: 28px max(24px, var(--safe-right)) 48px max(24px, var(--safe-left));
+}
+
+@media (max-width: 720px) {
+    .topbar { height: calc(52px + var(--safe-top)); }
+    .topbar-inner { padding: 0 max(14px, var(--safe-right)) 0 max(14px, var(--safe-left)); }
+    .page { padding: 18px max(14px, var(--safe-right)) calc(32px + var(--safe-bottom)) max(14px, var(--safe-left)); }
+}
+
+/* ---- login --------------------------------------------------------------- */
+
+.login {
+    min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(91, 157, 255, 0.13), transparent 70%),
+        var(--bg);
+}
+.login-card {
+    width: min(360px, 100%); display: grid; gap: 16px; padding: 32px 28px 28px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow);
+}
+.login-brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 8px; }
+.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 15px; }
+.login-brand h1 { font-size: 1.35rem; }
+.login-error { min-height: 1.2em; margin: -4px 0 -4px; color: #ff7a7c; font-size: 0.88rem; text-align: center; }
+.login .btn { min-height: 48px; font-size: 1rem; }

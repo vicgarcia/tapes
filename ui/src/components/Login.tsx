@@ -1,82 +1,83 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Container, Form, Button } from "react-bootstrap";
-import { useAuth, AuthProviderType } from "@app/services/auth";
+import { useLocation, useNavigate } from "react-router-dom";
+import { isBadCredentials, useAuth } from "@app/services/auth";
+import { Icon } from "./common/Icon";
 
 export function Login() {
-    const [login, setLogin] = useState<string|null>(null);
-    const [password, setPassword] = useState<string|null>(null);
-    const [error, setError] = useState<string|null>(null);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
 
     const navigate = useNavigate();
-    const auth = useAuth() as AuthProviderType;
+    const location = useLocation();
+    const auth = useAuth();
+
+    // back to where the user was headed before the login redirect
+    const from = (location.state as { from?: { pathname: string, search: string } } | null)?.from;
 
     useEffect(() => {
-        if (auth.isAuthenticated === true) {
-            navigate('/dashboard');
+        if (auth.status === 'authenticated') {
+            navigate(from ? `${from.pathname}${from.search}` : '/', { replace: true });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auth.isAuthenticated]);
+    }, [auth.status, from, navigate]);
 
-    const updateLogin = (value: string) => {
-        setError(null);
-        setLogin(value);
-    };
-
-    const updatePassword = (value: string) => {
-        setError(null);
-        setPassword(value);
-    };
-
-    const submit = (e: FormEvent<HTMLFormElement>) => {
+    const submit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        let hasError = false;
-        if (login === null || login === '') {
-            setError('enter login')
-            hasError = true;
-        }
-        if (password === null || password === '') {
-            setError('enter password')
-            hasError = true;
-        }
-        if (!hasError) {
-            auth.login(login!, password!)
-                .catch(() => {
-                    setError('login failed');
-                });
+        if (username.trim() === '') return setError('Enter your username');
+        if (password === '') return setError('Enter your password');
+        setBusy(true);
+        try {
+            await auth.login(username.trim(), password);
+        } catch (err) {
+            setError(isBadCredentials(err) ? 'Wrong username or password' : 'Could not sign in, try again');
+            setBusy(false);
         }
     };
 
-    return <Container fluid='md'>
-        <Container className='text-center' style={{marginTop: '200px', width: '300px'}}>
-            <Form onSubmit={submit}>
-                <Form.Group className='mb-2'>
-                    <Form.Control type='text'
-                        placeholder='username'
-                        className='login-form-textbox text-center'
-                        value={login !== null ? login : ''}
-                        onChange={(e) => updateLogin(e.currentTarget.value)}
-                        // isInvalid={error !== null}
-                    />
-                </Form.Group>
-                <Form.Group className='mb-3'>
-                    <Form.Control type='password'
-                        placeholder='password'
-                        className='login-form-textbox text-center'
-                        value={password !== null ? password : ''}
-                        onChange={(e) => updatePassword(e.currentTarget.value)}
-                        // isInvalid={error !== null}
-                    />
-                </Form.Group>
-                {error && (
-                    <div className='text-danger mb-3 text-center'>
-                        {error}
-                    </div>
-                )}
-                <div className='text-end'>
-                    <Button type='submit' variant='primary' size="sm" className='px-4'>log in</Button>
-                </div>
-            </Form>
-        </Container>
-    </Container>
+    const edit = (setter: (value: string) => void) => (value: string) => {
+        setError(null);
+        setter(value);
+    };
+
+    if (auth.status === 'checking') return null;
+
+    return <main className="login">
+        <form className="login-card" onSubmit={submit} noValidate>
+            <div className="login-brand">
+                <span className="brand-mark"><Icon name="shield" size={26} /></span>
+                <h1>Tapes</h1>
+            </div>
+            <label className="field">
+                <span>Username</span>
+                <input
+                    type="text"
+                    name="username"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={username}
+                    onChange={e => edit(setUsername)(e.currentTarget.value)}
+                    aria-invalid={error !== null}
+                    autoFocus
+                />
+            </label>
+            <label className="field">
+                <span>Password</span>
+                <input
+                    type="password"
+                    name="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => edit(setPassword)(e.currentTarget.value)}
+                    aria-invalid={error !== null}
+                />
+            </label>
+            <div className="login-error" role="alert">{error}</div>
+            <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
+                {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+        </form>
+    </main>;
 }
