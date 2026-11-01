@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 docker run --rm -v "$PWD/ui:/src" -w /src node:20.19.5-slim sh -c 'npm ci && npm run build && npm run lint'
+# The UI build writes into api/dist, but the UI container has only the UI bind-mounted.
+# Build it again with both repo paths mounted so the generated embed assets are available.
+docker run --rm -v "$PWD/ui:/src/ui" -v "$PWD/api:/src/api" -w /src/ui node:20.19.5-slim sh -c 'npm ci && npm run build'
 docker run --rm -v "$PWD/api:/src" -w /src golang:1.26.10-bookworm sh -c 'go vet ./... && go test ./...'
 docker build -t tapes:test .
 compose=(docker compose -p tapes-test -f test/docker-compose.yml)
