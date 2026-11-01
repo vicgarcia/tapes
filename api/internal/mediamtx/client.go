@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 type Track struct {
@@ -56,5 +55,3 @@ func HLSHost() string {
 	return u.Host
 }
 func PlaybackURL() string { return base("MEDIAMTX_PLAYBACK_URL", "http://mediamtx:9996") }
-
-var _ = time.Second

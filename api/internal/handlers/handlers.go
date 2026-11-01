@@ -8,7 +8,6 @@ import (
 	"github.com/vicgarcia/tapes/internal/mediamtx"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -115,5 +114,3 @@ func LiveStreamHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, resp.Body)
 }
-
-var _ = url.Values{}
