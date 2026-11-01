@@ -2,10 +2,11 @@ package cameras
 
 import (
 	"fmt"
-	"github.com/vicgarcia/tapes/internal/mediamtx"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/vicgarcia/tapes/internal/mediamtx"
 )
 
 // Video represents a camera's video track.

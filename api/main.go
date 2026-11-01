@@ -2,14 +2,16 @@ package main
 
 import (
 	"embed"
-	"github.com/gorilla/mux"
-	"github.com/vicgarcia/tapes/internal/auth"
-	"github.com/vicgarcia/tapes/internal/handlers"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/gorilla/mux"
+
+	"github.com/vicgarcia/tapes/internal/auth"
+	"github.com/vicgarcia/tapes/internal/handlers"
 )
 
 //go:embed dist

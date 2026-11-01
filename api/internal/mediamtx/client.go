@@ -3,10 +3,11 @@ package mediamtx
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/vicgarcia/tapes/internal/env"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/vicgarcia/tapes/internal/env"
 )
 
 // Track describes a MediaMTX video track.
