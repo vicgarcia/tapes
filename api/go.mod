@@ -1,11 +1,10 @@
 module github.com/vicgarcia/tapes
 
-go 1.22
+go 1.26
 
 require (
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
-	gocv.io/x/gocv v0.37.0
 )
 
 require (

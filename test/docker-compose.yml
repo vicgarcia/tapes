@@ -12,6 +12,23 @@ services:
       - ./mediamtx.yml:/mediamtx.yml:ro
       - recordings:/cameras
 
+  tapes:
+    image: tapes:test
+    container_name: tapes-test-api
+    networks:
+      default:
+        aliases: [tapes]
+    environment:
+      JWT_KEY: test-key
+      PASSWORDS_PATH: /passwords
+      MEDIAMTX_API_URL: http://mediamtx:9997
+      MEDIAMTX_PLAYBACK_URL: http://mediamtx:9996
+      MEDIAMTX_HLS_URL: http://mediamtx:8888
+      MEDIAMTX_USER: tapes
+      MEDIAMTX_PASS: ${MEDIAMTX_PASS}
+    volumes:
+      - ./authfile:/passwords:ro
+
   curl:
     image: curlimages/curl:8.12.1
     profiles: [tools]

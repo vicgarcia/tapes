@@ -12,7 +12,7 @@ Tapes is a camera-recording application with a Go backend in `api/`, a React/Typ
 - In code and configuration files, group related statements or settings together and use blank lines between distinct logical blocks. Keep configuration comments terse and adjacent to the setting they describe.
 
 ## Go conventions
-- Follow idiomatic Go and standard-library conventions. Run `gofmt` on changed Go files and keep imports organized.
+- Follow idiomatic Go and standard-library conventions. Run `gofmt` on changed Go files and keep imports organized: standard-library imports first, external dependencies second, and internal project imports last, with blank lines between groups.
 - Use meaningful names and small, cohesive functions. Return errors to callers that can handle them, wrapping with `%w` when adding context. Check errors at the operation that produces them; avoid ignored errors unless intentional and documented.
 - Do not panic for ordinary runtime failures. Clean up resources explicitly, using `defer` where appropriate.
 - Keep APIs and data ownership clear. Avoid unnecessary global state, duplication, and abstractions that do not reduce complexity. Use context cancellation for work tied to a request or service lifecycle.

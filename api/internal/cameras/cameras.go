@@ -2,62 +2,72 @@ package cameras
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"sort"
+	"sync"
+	"time"
 
-	"github.com/vicgarcia/tapes/internal/env"
+	"github.com/vicgarcia/tapes/internal/mediamtx"
 )
 
-// Camera represents a camera with its storage paths
+// Video represents a camera's video track.
+type Video struct {
+	Codec  string `json:"codec"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+// Camera represents a camera and its current stream status.
 type Camera struct {
-	Path string `json:"-"`
-	Name string `json:"name"`
+	Name   string `json:"name"`
+	Online bool   `json:"online"`
+	Video  *Video `json:"video"`
 }
 
-// GetStoragePath returns the base storage path from environment variable
-func GetStoragePath() (string, error) {
-	storagePath := env.GetWithDefault("STORAGE_PATH", "/cameras")
-	return storagePath, nil
-}
+// Cache MediaMTX camera paths briefly to reduce control API requests.
+var (
+	mu     sync.Mutex
+	cache  []Camera
+	cached time.Time
+)
 
-// GetAll returns a list of all available cameras
+// GetAll returns cameras reported by MediaMTX, sorted by name.
 func GetAll() ([]Camera, error) {
-	storagePath, err := GetStoragePath()
+	mu.Lock()
+	defer mu.Unlock()
+	if time.Since(cached) < 2*time.Second && cache != nil {
+		return append([]Camera(nil), cache...), nil
+	}
+	rows, err := mediamtx.Paths()
 	if err != nil {
 		return nil, err
 	}
-
-	dirs, err := os.ReadDir(storagePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %w", err)
+	out := make([]Camera, 0, len(rows))
+	for _, p := range rows {
+		c := Camera{Name: p.Name, Online: p.Ready}
+		if p.Ready && len(p.Tracks) > 0 {
+			t := p.Tracks[0]
+			if t.CodecProps != nil {
+				c.Video = &Video{Codec: t.Codec, Width: t.CodecProps.Width, Height: t.CodecProps.Height}
+			}
+		}
+		out = append(out, c)
 	}
-
-	cameras := make([]Camera, 0)
-	for _, d := range dirs {
-		path := filepath.Join(storagePath, d.Name())
-		cameras = append(cameras, Camera{Path: path, Name: d.Name()})
-	}
-
-	return cameras, nil
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	cache = out
+	cached = time.Now()
+	return append([]Camera(nil), out...), nil
 }
 
-// GetByName returns a camera by its name
-func GetByName(cameraName string) (Camera, error) {
-	storagePath, err := GetStoragePath()
-	if err != nil {
-		return Camera{}, err
+// GetByName returns the camera with the given name.
+func GetByName(name string) (Camera, error) {
+	all, e := GetAll()
+	if e != nil {
+		return Camera{}, e
 	}
-
-	cameraPath := filepath.Join(storagePath, cameraName)
-	_, cameraPathExistsErr := os.Stat(cameraPath)
-	if cameraPathExistsErr != nil {
-		return Camera{}, cameraPathExistsErr
+	for _, c := range all {
+		if c.Name == name {
+			return c, nil
+		}
 	}
-
-	camera := Camera{
-		Name: cameraName,
-		Path: cameraPath,
-	}
-
-	return camera, nil
+	return Camera{}, fmt.Errorf("unknown camera")
 }
