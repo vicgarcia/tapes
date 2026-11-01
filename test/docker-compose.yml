@@ -1,7 +1,6 @@
 services:
   mediamtx:
     image: bluenviron/mediamtx:1.21.2-ffmpeg
-    container_name: tapes-test-mediamtx
     networks:
       default:
         aliases: [mediamtx]
@@ -13,8 +12,7 @@ services:
       - recordings:/cameras
 
   tapes:
-    image: tapes:test
-    container_name: tapes-test-api
+    image: ${TAPES_TEST_IMAGE:-tapes:test}
     networks:
       default:
         aliases: [tapes]
@@ -41,4 +39,3 @@ services:
 
 volumes:
   recordings:
-    name: tapes-test-recordings
