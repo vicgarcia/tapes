@@ -3,5 +3,6 @@ import App from '@app/components/App';
 
 import './styles/base.css';
 import './styles/shell.css';
+import './styles/cameras.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<App />);

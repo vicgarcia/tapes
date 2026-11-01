@@ -1,0 +1,43 @@
+/* Camera home tiles. */
+
+.camera-grid {
+    display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr));
+}
+.camera-grid:empty { display: none; }
+
+.camera-tile {
+    display: block; overflow: hidden; border-radius: var(--radius);
+    background: var(--surface); border: 1px solid var(--border);
+    transition: border-color 0.15s, transform 0.15s;
+}
+.camera-tile:hover { border-color: var(--border-strong); }
+.camera-tile:active { transform: scale(0.995); }
+.camera-tile.is-skeleton { aspect-ratio: 16 / 11; }
+
+.camera-tile-image { position: relative; background: #000; overflow: hidden; }
+.camera-tile-image img { width: 100%; height: 100%; object-fit: cover; }
+.camera-tile.is-offline .camera-tile-image img { filter: grayscale(1) brightness(0.55); }
+.camera-tile-empty {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: var(--text-3); font-size: 0.88rem;
+    background: repeating-linear-gradient(45deg, #0f1216 0 10px, #12161b 10px 20px);
+}
+.camera-tile-live { position: absolute; top: 10px; left: 10px; }
+.camera-tile-age { position: absolute; bottom: 10px; left: 10px; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--warn); }
+
+.camera-tile-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.camera-tile-info h2 { text-transform: uppercase; letter-spacing: 0.04em; font-size: 1.05rem; overflow-wrap: anywhere; min-width: 0; }
+
+.camera-status { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.status-pill {
+    display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 650;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.status-pill.is-online { color: var(--ok); background: rgba(62, 207, 142, 0.12); }
+.status-pill.is-offline { color: var(--text-3); background: var(--surface-3); }
+
+@media (max-width: 720px) {
+    .camera-grid { gap: 14px; }
+}

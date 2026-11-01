@@ -5,6 +5,7 @@ import { useServerStatus } from '@app/hooks/useServerStatus';
 import { Login } from './Login';
 import { Offline } from './Offline';
 import { Icon } from './common/Icon';
+import { CamerasHome } from './cameras/CamerasHome';
 
 const CameraView = lazy(() => import('./player/CameraView'));
 
@@ -19,7 +20,7 @@ export default function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/logout" element={<Logout />} />
                 <Route element={<RequireAuth><Shell /></RequireAuth>}>
-                    <Route path="/" element={<main className="page"><h1>Cameras</h1><p>Camera home is coming next.</p></main>} />
+                    <Route path="/" element={<CamerasHome />} />
                 </Route>
                 <Route path="/cameras/:name" element={<RequireAuth><Suspense fallback={<main className="fullscreen-state"><div className="spinner" /></main>}><CameraView /></Suspense></RequireAuth>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
