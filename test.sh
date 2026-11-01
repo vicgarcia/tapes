@@ -37,15 +37,15 @@ test "$(curl_stack -o /dev/null -w '%{http_code}' -u 'tapes:wrong-password' 'htt
 test "$(curl_stack -o /dev/null -w '%{http_code}' 'http://mediamtx:9996/list?path=test')" = 401
 
 paths=$(curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" http://mediamtx:9997/v3/paths/list)
-printf '%s' "$paths" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).items.find(x=>x.name==="test");if(!p?.ready||!JSON.stringify(p.tracks).includes("H264")||!JSON.stringify(p.tracks).includes("640x360"))process.exit(1)})'
+printf '%s' "$paths" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).items.find(x=>x.name==="test");if(!p?.ready||p.tracks2?.[0]?.codec!=="H264"||p.tracks2[0].codecProps.width!==640||p.tracks2[0].codecProps.height!==360)process.exit(1)})'
 test "$(curl_stack -o /dev/null -w '%{http_code}' http://mediamtx:9997/v3/paths/list)" = 401
 
 headers=$(curl_stack -D - -o /dev/null http://mediamtx:8888/test/index.m3u8)
 printf '%s' "$headers" | grep -Eiq '^HTTP/[^ ]+ 302'
-printf '%s' "$headers" | grep -Eiq '^location: .*\?cookieCheck=1'
+printf '%s' "$headers" | grep -Eiq '^location: /test/index\.m3u8\?cookieCheck=1'
 
 # The anonymous internal user can read but cannot publish.
-if curl_stack --max-time 8 -fsS -T /dev/null 'rtsp://mediamtx:8554/intruder' >/dev/null 2>&1; then
+if "${compose[@]}" run --rm --no-deps publisher -re -f lavfi -i testsrc=size=64x64:rate=1 -t 1 -c:v libx264 -f rtsp rtsp://mediamtx:8554/intruder >/dev/null 2>&1; then
   echo 'unexpectedly published to intruder' >&2
   exit 1
 fi

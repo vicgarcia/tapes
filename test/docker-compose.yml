@@ -17,6 +17,11 @@ services:
     profiles: [tools]
     entrypoint: ["curl"]
 
+  publisher:
+    image: bluenviron/mediamtx:1.21.2-ffmpeg
+    profiles: [tools]
+    entrypoint: ["ffmpeg"]
+
 volumes:
   recordings:
     name: tapes-test-recordings
