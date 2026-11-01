@@ -11,19 +11,23 @@ import (
 	"strings"
 )
 
+// jsonError writes a JSON error response with the given status code.
 func jsonError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
+// HealthHandler returns the status used by health checks.
 func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, `{"status":"success"}`)
 }
+// AuthHandler returns success when the authentication cookie is valid.
 func AuthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, `{"status":"success"}`)
 }
+// LoginHandler sets the authentication cookie after validating credentials.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	p, e := auth.GetPasswd()
@@ -43,11 +47,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, `{"status":"success"}`)
 }
+// LogoutHandler clears the authentication cookie.
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	_ = auth.DeleteCookie(w)
 	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, `{"status":"success"}`)
 }
+// CamerasHandler returns the available cameras.
 func CamerasHandler(w http.ResponseWriter, r *http.Request) {
 	cs, e := cameras.GetAll()
 	if e != nil {
@@ -57,6 +63,7 @@ func CamerasHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(cs)
 }
+// CameraHandler returns a camera by name.
 func CameraHandler(w http.ResponseWriter, r *http.Request) {
 	c, e := cameras.GetByName(mux.Vars(r)["camera"])
 	if e != nil {
@@ -70,6 +77,7 @@ func CameraHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(c)
 }
+// LiveStreamHandler proxies an HLS live stream from MediaMTX.
 func LiveStreamHandler(w http.ResponseWriter, r *http.Request) {
 	camera := mux.Vars(r)["camera"]
 	if _, e := cameras.GetByName(camera); e != nil {
