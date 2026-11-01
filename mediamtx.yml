@@ -1,100 +1,58 @@
 # MediaMTX config
 
-# Log level: debug, info, warn, error
-# Set to warn to reduce RTP packet loss noise (expected with IP cameras)
 logLevel: warn
-# Log destinations: stdout, file, syslog
 logDestinations: [stdout]
-
-# Enable Control API for monitoring
+authInternalUsers:
+  - user: any          # compose network and published rtsp: read only
+    pass:
+    ips: []
+    permissions:
+      - action: read
+  - user: tapes        # the api; password comes from MEDIAMTX_PASS via compose
+    pass: set-by-environment
+    ips: []
+    permissions:
+      - action: playback
+      - action: api
+  - user: any          # debugging from inside the container
+    pass:
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: api
+      - action: metrics
+      - action: pprof
 api: yes
-apiAddress: 127.0.0.1:9997
-
-# Connection timeouts
+apiAddress: :9997
+playback: yes
+playbackAddress: :9996
 readTimeout: 10s
 writeTimeout: 10s
-
-# Increase buffer to handle packet loss better
 writeQueueSize: 2048
-
-# RTSP Configuration
-
-# Enable RTSP
 rtsp: yes
-# Supported transports (TCP recommended for reliability)
-protocols: [tcp, udp]
-# RTSP listener address
 rtspAddress: :8554
-# No encryption (can enable with rtsps if needed)
-encryption: "no"
-# Authentication methods
-authMethods: [basic]
-
-# Disable Unnecessary Protocols
-
-# Disable RTMP
-rtmp: no
-
-# Enable HLS for live streaming
+rtspTransports: [tcp, udp]
+rtspEncryption: "no"
+rtspAuthMethods: [basic]
 hls: yes
 hlsAddress: :8888
-# Always remux - ensures streams are available even if no one is watching
 hlsAlwaysRemux: yes
-# Stable HLS settings - increase segment duration and count for more buffering
-hlsSegmentDuration: 3s
-hlsSegmentCount: 10
-# Disable Low-Latency HLS to avoid part duration issues
-hlsPartDuration: 0s
-# Increased variant to handle packet loss better
-hlsVariant: mpegts
-
-# Disable WebRTC
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentCount: 7       # lowLatency needs at least 7
+rtmp: no
 webrtc: no
-
-# Disable SRT
 srt: no
-
-# Recording Configuration (Built-in)
-
+moq: no
 pathDefaults:
-  # Enable recording for all paths by default
   record: yes
-
-  # Recording path pattern
-  # %path = camera name (garage, kitchen, study)
-  # Result: /cameras/garage/20251108143000.mp4
-  recordPath: /cameras/%path/%Y%m%d%H%M%S
-
-  # Recording format: fmp4 (fragmented MP4)
-  # Better crash resilience than mpegts, MP4 compatible
+  # %f is required by playback, %z keeps names unique when DST falls back
+  recordPath: /cameras/%path/%Y%m%d%H%M%S-%f%z
   recordFormat: fmp4
-
-  # Part duration - data flushed to disk every 1 second
-  # If system crashes, max 1 second of data lost (RPO)
   recordPartDuration: 1s
-
-  # Segment duration - create new file every 5 minutes
-  # Matches your 300-second (5-minute) recording segments
   recordSegmentDuration: 5m
-
-  # Delete segments older than 90 days
-  # Set to 0 to keep forever, or adjust based on storage
   recordDeleteAfter: 90d
-
-  # Use TCP by default for camera connections (more reliable)
-  sourceProtocol: tcp
-
-# Camera Configuration
-
+  rtspTransport: tcp
 paths:
-
-  # Kitchen camera
-  kitchen:
-    source: rtsp://admin:123456@192.168.144.114:554/live/ch0
-    sourceProtocol: tcp
-
-  # Add additional cameras here following the same pattern:
-
   # garage:
-  #   source: rtsp://admin:password@192.168.x.x:554/stream
-  #   sourceProtocol: tcp
+  #   source: rtsp://user:password@192.0.2.10:554/stream

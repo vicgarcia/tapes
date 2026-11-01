@@ -1,12 +1,14 @@
 services:
 
   mediamtx:
-    image: bluenviron/mediamtx:latest
+    image: bluenviron/mediamtx:1.21.2
     container_name: mediamtx
     restart: unless-stopped
-    user: "${UID}:${GID}"
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8554:8554"
+    environment:
+      - MTX_AUTHINTERNALUSERS_1_PASS=${MEDIAMTX_PASS:?set MEDIAMTX_PASS in .env}
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
@@ -17,7 +19,7 @@ services:
     image: ghcr.io/vicgarcia/tapes:latest
     container_name: tapes
     restart: unless-stopped
-    user: "${UID}:${GID}"    
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       - TZ=${TZ:-UTC}
       - JWT_KEY=${JWT_KEY}
@@ -26,6 +28,8 @@ services:
     ports:
       - "8671:8671"
     volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
       - ./passwords:/opt/tapes/passwords:ro
       - ./data/cameras:/cameras
     depends_on:
