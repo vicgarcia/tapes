@@ -41,10 +41,11 @@ docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordi
 migration_output=$(docker run --rm -v tapes-test-recordings:/recordings -v "$PWD/scripts:/scripts:ro" -e TZ=UTC alpine:3.21 sh -c 'apk add --no-cache bash coreutils >/dev/null && bash /scripts/migrate-recordings.sh /recordings')
 printf '%s' "$migration_output" | grep -q 'Files moved: 1'
 recording_stamp=$(docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "basename /recordings/test/'$legacy_timestamp'-000000+0000.mp4 .mp4")
-playback_start=$(date -u -d "${recording_stamp:0:14}" +%Y-%m-%dT%H:%M:%SZ)
-playback_end=$(date -u -d "${playback_start} + 10 seconds" +%Y-%m-%dT%H:%M:%SZ)
-list_response=$(curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" "http://mediamtx:9996/list?path=test&start=$playback_start&end=$playback_end")
-printf '%s' "$list_response" | grep -q "$recording_stamp"
+recording_start=$(date -u -d "${recording_stamp:0:4}-${recording_stamp:4:2}-${recording_stamp:6:2} ${recording_stamp:8:2}:${recording_stamp:10:2}:${recording_stamp:12:2}" +%Y-%m-%dT%H:%M:%SZ)
+list_response=$(curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" "http://mediamtx:9996/list?path=test&start=$recording_start")
+node -e 'const rows=JSON.parse(process.argv[1]);if(!rows.some(r=>r.start===process.argv[2]))process.exit(1)' "$list_response" "$recording_start"
+playback_url=$(node -e 'process.stdout.write(JSON.parse(process.argv[1])[0].url)' "$list_response")
+curl_stack -fsS -u "tapes:${MEDIAMTX_PASS}" -o /dev/null "$playback_url"
 docker run --rm --network "tapes-test_default" -v tapes-test-recordings:/recordings alpine:3.21 sh -c "test ! -e /recordings/test/'$legacy_timestamp'.jpg"
 # The migration is idempotent, and dry-run leaves a fresh legacy recording untouched.
 second=$(docker run --rm -v tapes-test-recordings:/recordings -v "$PWD/scripts:/scripts:ro" -e TZ=UTC alpine:3.21 sh -c 'apk add --no-cache bash coreutils >/dev/null && bash /scripts/migrate-recordings.sh /recordings')
