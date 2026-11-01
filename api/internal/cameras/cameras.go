@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-// Video describes a camera's video track.
+// Video represents a camera's video track.
 type Video struct {
 	Codec  string `json:"codec"`
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
 }
 
-// Camera describes a camera and its current stream status.
+// Camera represents a camera and its current stream status.
 type Camera struct {
 	Name   string `json:"name"`
 	Online bool   `json:"online"`
