@@ -14,7 +14,7 @@ httpClient.interceptors.response.use(
         console.log('error response', error)
         if (error.response.status === 401) {
             window.location.href = '/#/logout';
-        };
+        }
         return Promise.reject(error);
     }
 );

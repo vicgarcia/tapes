@@ -1,23 +1,21 @@
 import axios from "axios";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Navigate, useLocation } from 'react-router-dom';
-import httpClient from "@app/services/base";
 
 export type AuthProviderType = {
   isAuthenticated: boolean
-  login: Function
-  logout: Function
+  login: (username: string, password: string) => Promise<void>
+  logout: () => Promise<void>
 }
 
-// @ts-ignore
-const AuthContext = createContext();
+const AuthContext = createContext<AuthProviderType|undefined>(undefined);
 
-export const AuthProvider = ({ children }: any) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     axios.get('/auth')
-      .then(_ => setIsAuthenticated(true));
+      .then(() => setIsAuthenticated(true));
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -26,14 +24,14 @@ export const AuthProvider = ({ children }: any) => {
     payload.append('password', password);
 
     return axios.post('/login', payload)
-      .then(response => {
+      .then(() => {
         setIsAuthenticated(true);
       });
   };
 
   const logout = async () => {
     return axios.post('/logout')
-      .then(response => {
+      .then(() => {
         setIsAuthenticated(false);
       })
   }
@@ -44,6 +42,7 @@ export const AuthProvider = ({ children }: any) => {
   </AuthContext.Provider>
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = (): AuthProviderType => {
   return useContext(AuthContext) as AuthProviderType;
 };
@@ -53,14 +52,14 @@ export type RequireAuthProps = {
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  let auth = useAuth();
-  let location = useLocation();
+  const auth = useAuth();
+  const location = useLocation();
   if (auth.isAuthenticated !== true) return <Navigate to="/login" state={{ from: location }} />;
   return children;
 }
 
 export function Logout() {
-  let auth = useAuth();
+  const auth = useAuth();
   auth.logout();
   return <Navigate to="/login" />
 }

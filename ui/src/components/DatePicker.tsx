@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Container, Row, Col, Form } from "react-bootstrap";
 import dayjs from 'dayjs';
 
@@ -64,18 +64,18 @@ function getMonthStartAndLength(arg: YearAndMonth) {
 
 export type DatePickerProps = {
     selected: Date|null
-    setSelected: Function
+    setSelected: (date: Date) => void
 }
 
 export function DatePicker({selected, setSelected}: DatePickerProps) {
     const [currentYearAndMonth, setCurrentYearAndMonth] = useState<YearAndMonth>(getCurrentYearAndMonth());
 
-    const clickPrevious = (_e: React.MouseEvent<HTMLButtonElement>) => {
+    const clickPrevious = () => {
         const previous = getPreviousYearAndMonth(currentYearAndMonth);
         setCurrentYearAndMonth(previous);
     };
 
-    const clickNext = (_e: React.MouseEvent<HTMLButtonElement>) => {
+    const clickNext = () => {
         const next = getNextYearAndMonth(currentYearAndMonth);
         setCurrentYearAndMonth(next);
     };
@@ -84,8 +84,8 @@ export function DatePicker({selected, setSelected}: DatePickerProps) {
         return new Date(current.year, current.month, day);
     }
 
-    let [start, length] = getMonthStartAndLength(currentYearAndMonth!);
-    let rows = [];
+    const [start, length] = getMonthStartAndLength(currentYearAndMonth!);
+    const rows = [];
     let columns = [];
     for (let i = 1; i <= length ; i++) {
         if (i === 1) {
@@ -104,7 +104,7 @@ export function DatePicker({selected, setSelected}: DatePickerProps) {
             );
         } else {
             columns.push(
-                <Col className='fw-strong' onClick={_ => setSelected(calendarDate(currentYearAndMonth, i))}>{i}</Col>
+                <Col className='fw-strong' onClick={() => setSelected(calendarDate(currentYearAndMonth, i))}>{i}</Col>
             );
         }
         if (i === length) {

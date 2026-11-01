@@ -5,7 +5,7 @@ import { getCameras } from '@app/services/cameras';
 
 export type CameraSelectProps = {
     selected: Camera|null
-    setSelected: Function
+    setSelected: (camera: Camera|null) => void
 }
 
 export function CameraSelect({selected, setSelected}: CameraSelectProps) {
@@ -19,11 +19,12 @@ export function CameraSelect({selected, setSelected}: CameraSelectProps) {
                 setSelected(response[0]);
             }
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const updateSelected = (value: string) => {
         const camera = cameras.find(obj => obj.name === value);
-        setSelected(camera);
+        setSelected(camera ?? null);
     }
 
     return <div className="d-grid gap-3">

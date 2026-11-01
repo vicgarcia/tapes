@@ -15,6 +15,7 @@ export function Login() {
         if (auth.isAuthenticated === true) {
             navigate('/dashboard');
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auth.isAuthenticated]);
 
     const updateLogin = (value: string) => {
@@ -39,7 +40,7 @@ export function Login() {
             hasError = true;
         }
         if (!hasError) {
-            auth.login(login, password)
+            auth.login(login!, password!)
                 .catch(() => {
                     setError('login failed');
                 });

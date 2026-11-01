@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Form } from "react-bootstrap";
+import { useEffect } from "react";
+import { Form } from "react-bootstrap";
 import dayjs from 'dayjs';
 
 export type DateSelectProps = {
     selected: Date|null
-    setSelected: Function
+    setSelected: (date: Date) => void
 }
 
 export function DateSelect({selected, setSelected}: DateSelectProps) {
@@ -13,11 +13,12 @@ export function DateSelect({selected, setSelected}: DateSelectProps) {
         if (selected === null) {
             setSelected(new Date());
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const updateSelected = (value: string) => {
         console.log(value);
-        setSelected(new Date(value.replace(/-/g, '\/')));
+        setSelected(new Date(value.replace(/-/g, '/')));
     }
 
     return <div className='d-grid gap-3'>
