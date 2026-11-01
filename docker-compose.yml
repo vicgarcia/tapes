@@ -9,11 +9,6 @@ services:
       - "8554:8554"
     environment:
       - MTX_AUTHINTERNALUSERS_1_PASS=${MEDIAMTX_PASS:?set MEDIAMTX_PASS in .env}
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
@@ -25,11 +20,6 @@ services:
     container_name: tapes
     restart: unless-stopped
     user: "${UID:-1000}:${GID:-1000}"
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
     environment:
       - TZ=${TZ:-UTC}
       - JWT_KEY=${JWT_KEY}
