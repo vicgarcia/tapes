@@ -2,6 +2,9 @@ services:
   mediamtx:
     image: bluenviron/mediamtx:1.21.2-ffmpeg
     container_name: tapes-test-mediamtx
+    networks:
+      default:
+        aliases: [mediamtx]
     environment:
       MTX_AUTHINTERNALUSERS_1_PASS: ${MEDIAMTX_PASS}
       MTX_AUTHINTERNALUSERS_3_PASS: ""
