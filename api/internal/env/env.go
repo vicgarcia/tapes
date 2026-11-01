@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// GetWithDefault retrieves an environment variable or returns the default value if not set
+// GetWithDefault returns an environment variable or the default when unset.
 func GetWithDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -13,7 +13,7 @@ func GetWithDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// GetString retrieves a string environment variable or returns the default value if not set
+// GetString returns a string environment variable or the default when unset.
 func GetString(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -21,7 +21,7 @@ func GetString(key, defaultValue string) string {
 	return defaultValue
 }
 
-// GetInt retrieves an integer environment variable or returns the default value if not set or invalid
+// GetInt returns an integer environment variable or the default when unset or invalid.
 func GetInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
