@@ -1,38 +1,43 @@
 # Agent guidance
 
 ## Project overview
-Tapes is a camera-recording application with a Go backend in `api/`, a React/TypeScript UI in `ui/`, and Docker-based deployment. Keep changes focused and follow the established package boundaries and project patterns. Prefer documenting current behavior over assuming the older `CLAUDE.md` description is authoritative.
+Tapes is a camera-recording application with a Go backend in `api/`, a React/TypeScript UI in `ui/`, and Docker-based deployment. Keep changes focused and follow established package boundaries and patterns. Prefer documenting current behavior over assuming the older `CLAUDE.md` description is authoritative.
 
-## Comments and documentation
-- Comments should explain intent, constraints, non-obvious behavior, or public contracts—not narrate the code or repeat what the next line already says. Remove or update comments when the implementation changes.
-- Write comments in clear, grammatical sentences. Use normal capitalization and punctuation; avoid conversational shorthand, stale status notes, decorative checkmarks, and excessive prose.
-- In Go, document every exported package-level name with a doc comment that starts with its name (for example, `// GetAll returns ...`). Package comments should describe the package when its purpose is not self-evident.
-- Keep implementation comments close to the relevant code. Explain why a choice is necessary, especially around security, concurrency, filesystem behavior, or external-service integration. Do not add comments that merely restate an operation.
-- Preserve required compiler directives such as `//go:embed`; they are not prose comments. Keep generated-code markers and build tags in their required forms.
-- In TypeScript/JS, add comments only where types and code do not make the intent clear. Keep user-facing documentation and code comments distinct.
+## Comments and formatting
+- Keep comments terse and useful: explain intent, constraints, non-obvious behavior, or public contracts. Do not narrate code or repeat what the code already makes clear.
+- Apply the same comment standard to Go, JavaScript, and TypeScript. Write comments in clear, grammatical sentences; avoid shorthand, stale notes, decorative prose, and unnecessary commentary.
+- In Go, document exported package-level names with a doc comment beginning with the name (for example, `// GetAll returns ...`). Add package comments when they clarify the package's purpose.
+- Keep implementation comments next to the code they explain. Document important reasoning around security, concurrency, filesystem behavior, and external integrations.
+- Preserve required directives and markers, including `//go:embed`, build tags, and generated-code markers, in their required form.
+- In code and configuration files, group related statements or settings together and use blank lines between distinct logical blocks. Keep configuration comments terse and adjacent to the setting they describe.
 
 ## Go conventions
-- Follow idiomatic Go and the standard library's conventions. Use `gofmt` (and project checks) for all Go changes; keep imports grouped and let tooling format them.
-- Use meaningful names and small, cohesive functions. Return errors to callers when they can handle them; add context with `%w` when wrapping errors. Avoid ignored errors except when intentionally safe and documented.
-- Check errors at the operation that produces them. Do not panic for ordinary runtime failures. Keep resource cleanup explicit with `defer` where appropriate.
-- Keep APIs and data ownership clear. Avoid unnecessary global state, duplicated logic, and abstractions that do not reduce complexity. Use context cancellation for work that needs to stop with a request or service lifecycle.
-- Prefer standard library facilities and established dependencies. Validate and constrain untrusted input, especially paths, identifiers, and request data. Do not expose secrets in responses or logs.
-- Preserve existing structured logging via the logger package; use stable, descriptive messages and key/value attributes rather than string interpolation.
-- Add or update tests for behavior changes and edge cases. Tests should be deterministic, isolated, and avoid depending on external services unless the repository's integration setup explicitly provides them.
+- Follow idiomatic Go and standard-library conventions. Run `gofmt` on changed Go files and keep imports organized.
+- Use meaningful names and small, cohesive functions. Return errors to callers that can handle them, wrapping with `%w` when adding context. Check errors at the operation that produces them; avoid ignored errors unless intentional and documented.
+- Do not panic for ordinary runtime failures. Clean up resources explicitly, using `defer` where appropriate.
+- Keep APIs and data ownership clear. Avoid unnecessary global state, duplication, and abstractions that do not reduce complexity. Use context cancellation for work tied to a request or service lifecycle.
+- Prefer standard-library facilities and established dependencies. Validate and constrain untrusted input, especially paths, identifiers, and request data. Do not expose secrets in responses or logs.
+- Preserve structured logging through the logger package, using stable, descriptive messages and key/value attributes rather than string interpolation.
 
-## UI and API changes
-- Follow existing React/TypeScript patterns and keep API interactions in the service layer where established. Use the project lint and typecheck scripts for relevant UI changes.
-- Keep HTTP handlers focused on request parsing, validation, response status/headers, and delegation to business logic. Return appropriate status codes and avoid leaking internal errors to clients.
-- Maintain compatibility between backend JSON/API behavior and UI consumers; update tests and documentation when contracts change.
+## JavaScript and TypeScript conventions
+- Follow the existing React and TypeScript patterns; use the project's lint and typecheck scripts for relevant changes.
+- Prefer explicit types and clear, descriptive names. Keep components and functions focused, use existing service layers for API interactions, and avoid duplicated logic or unnecessary abstractions.
+- Handle asynchronous work and errors deliberately. Clean up effects and other resources when their lifecycle ends. Validate untrusted data at appropriate boundaries and do not expose secrets.
+- Keep UI behavior accessible and maintain compatibility with backend API and JSON contracts. Update tests and documentation when behavior or contracts change.
 
-## Commands and verification
-- Go sources are under `api/`; run `gofmt` on changed Go files and test the Go packages through the repository's `factory-test` workflow.
-- For UI changes, run the available lint and typecheck scripts in `ui/` through the project's prescribed test workflow.
-- Review `git diff` before committing. Do not make generated files or unrelated formatting changes unless required.
+## Configuration and deployment
+- Keep Dockerfiles, Compose files, MediaMTX settings, environment templates, and other configuration consistent with existing conventions and documented runtime behavior.
+- Group related settings into logical blocks separated by blank lines. Use concise comments to explain non-obvious choices; avoid comments that merely restate a setting.
+- Avoid committing secrets or machine-specific values. When changing configuration, update relevant templates and documentation together and verify the resulting configuration with available project checks.
+
+## Testing and review
+- Add or update tests for behavior changes and edge cases. Keep tests deterministic and isolated; rely on external services only when the repository's integration setup provides them.
+- Go sources are under `api/`. Use the repository's `factory-test` workflow for tests; do not run project tests directly outside that workflow.
+- Review `git diff` for correctness, scope, formatting, and stale comments before committing. Avoid generated files or unrelated formatting changes unless required.
 
 ## Repository map
 - `api/main.go`: HTTP routes and service startup.
 - `api/internal/`: authentication, camera discovery, HTTP handlers, logging, media operations, and environment helpers.
 - `ui/`: React/TypeScript client.
 - `test.sh`, `test/`, and `.factory/`: integration test setup and project test workflow.
-- `Dockerfile`, `docker-compose.yml`, `mediamtx.yml`: build and deployment configuration.
+- `Dockerfile`, `docker-compose.yml`, and `mediamtx.yml`: build and deployment configuration.
