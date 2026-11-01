@@ -1,6 +1,6 @@
 module github.com/vicgarcia/tapes
 
-go 1.26.10
+go 1.26
 
 require (
 	github.com/gorilla/mux v1.8.1
