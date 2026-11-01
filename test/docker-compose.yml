@@ -1,0 +1,27 @@
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.2-ffmpeg
+    container_name: tapes-test-mediamtx
+    networks:
+      default:
+        aliases: [mediamtx]
+    environment:
+      MTX_AUTHINTERNALUSERS_1_PASS: ${MEDIAMTX_PASS}
+      MTX_AUTHINTERNALUSERS_3_PASS: ""
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+      - recordings:/cameras
+
+  curl:
+    image: curlimages/curl:8.12.1
+    profiles: [tools]
+    entrypoint: ["curl"]
+
+  publisher:
+    image: bluenviron/mediamtx:1.21.2-ffmpeg
+    profiles: [tools]
+    entrypoint: ["ffmpeg"]
+
+volumes:
+  recordings:
+    name: tapes-test-recordings
