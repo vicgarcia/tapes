@@ -38,7 +38,7 @@ export function Stage({ player, children }: StageProps) {
     }, [engine]);
 
     // Largest box of the camera's aspect ratio that fits the stage cell, as
-    // --fit-w/--fit-h (used by the desktop and immersive layouts). Measured
+    // --fit-w/--fit-h for every layout. Measured
     // here rather than with CSS size containment: container-type: size on the
     // video's ancestor made Edge stall playback while the page re-rendered.
     const ratio = camera.video ? camera.video.width / camera.video.height : 16 / 9;
