@@ -141,8 +141,8 @@ test('updates check hourly while online, clean up, and reload only on request', 
 test('production manifest and worker contain only the shell and deny API navigations', async () => {
     const manifest = JSON.parse(await readFile('dist/manifest.webmanifest', 'utf8'));
     assert.equal(manifest.name, 'Tapes');
-    assert.equal(manifest.theme_color, '#0b0d10');
-    assert.equal(manifest.background_color, '#0b0d10');
+    assert.equal(manifest.theme_color, '#0a0a0a');
+    assert.equal(manifest.background_color, '#0a0a0a');
     assert.equal(manifest.display, 'standalone');
     for (const icon of manifest.icons) assert.ok((await readFile(`dist/${icon.src}`)).length > 0);
     const sw = await readFile('dist/sw.js', 'utf8');
