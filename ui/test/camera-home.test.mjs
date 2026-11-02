@@ -14,8 +14,10 @@ const { outputFiles } = await build({
     banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
     tsconfig: 'tsconfig.app.json',
     plugins: [{ name: 'camera-state', setup(build) {
-        build.onResolve({ filter: /^@app\/hooks\/(useSnapshot|useVisibility|usePoll)$/ }, args => ({ path: args.path, namespace: 'state' }));
+        build.onResolve({ filter: /^@app\/hooks\/(useSnapshot|useVisibility|usePoll|usePWA)$/ }, args => ({ path: args.path, namespace: 'state' }));
         build.onLoad({ filter: /.*/, namespace: 'state' }, () => ({ contents: `
+            export const useInstallOffer = () => ({ type: 'none' });
+            export const useAppUpdate = () => ({ needRefresh: false });
             export const useSnapshot = () => globalThis.cameraState.snapshot;
             export const usePoll = () => globalThis.cameraState.cameras;
             export const useInView = () => true;

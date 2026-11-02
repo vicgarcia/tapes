@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet, Link } from 'react-router-dom';
 import { AuthProvider, RequireAuth, Logout } from '@app/services/auth';
 import { useServerStatus } from '@app/hooks/useServerStatus';
+import { UpdatePrompt } from './PWAPrompts';
 import { Login } from './Login';
 import { Offline } from './Offline';
 import { Icon } from './common/Icon';
@@ -15,6 +16,7 @@ export default function App() {
     if (!isServerReachable) return <Offline onRetry={retry} />;
 
     return <HashRouter>
+        <UpdatePrompt />
         <AuthProvider>
             <Routes>
                 <Route path="/login" element={<Login />} />

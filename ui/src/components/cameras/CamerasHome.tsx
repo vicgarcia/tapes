@@ -2,6 +2,7 @@ import { getCameras } from '@app/services/cameras';
 import { SECOND } from '@app/lib/time';
 import { usePoll } from '@app/hooks/usePoll';
 import { Icon } from '@app/components/common/Icon';
+import { InstallPrompt } from '@app/components/PWAPrompts';
 import { CameraTile } from './CameraTile';
 
 /** Home: a tile per camera. */
@@ -10,6 +11,7 @@ export function CamerasHome() {
     const list = cameras.type === 'ready' ? cameras.data : [];
 
     return <main className="page">
+        <InstallPrompt />
         {cameras.type === 'loading' && <div className="camera-grid">
             <div className="camera-tile is-skeleton" /><div className="camera-tile is-skeleton" />
         </div>}

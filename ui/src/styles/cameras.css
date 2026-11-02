@@ -41,3 +41,14 @@
 @media (max-width: 720px) {
     .camera-grid { gap: 14px; }
 }
+
+/* Home-screen installation offer. */
+.install-banner {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.install-icon { display: flex; color: var(--ok); }
+.install-text { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.install-text strong { font-size: 0.9rem; }
+.install-text span { font-size: 0.8rem; color: var(--text-3); }
+.install-text .icon { display: inline; vertical-align: middle; }

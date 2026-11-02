@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Camera, PLAYBACK_RATES, PlaybackRate } from '@app/types';
-import { getCamera, getCameras } from '@app/services/cameras';
+import { getCamera } from '@app/services/cameras';
 import { ApiError } from '@app/services/base';
 import { addDays, formatDayShort, HOUR, MINUTE, SECOND, startOfDay } from '@app/lib/time';
 import { useNow, usePoll } from '@app/hooks/usePoll';
@@ -17,7 +17,6 @@ import { Timeline } from './Timeline';
 import { DayStrip } from './DayStrip';
 import { clampZoom, ZOOM_PRESETS } from './zoom';
 import { DayChips } from '@app/components/common/DayChips';
-import { CameraStrip } from '@app/components/cameras/CameraStrip';
 import '@app/styles/player.css';
 
 /** Route: /cameras/:name, optionally ?t=<epoch ms or RFC3339> to open at a recorded moment. */
@@ -60,7 +59,6 @@ function CameraPlayer({ camera, start }: { camera: Camera, start: number | null 
     const [zoom, setZoomState] = useState(initialZoom);
     const [scrub, setScrub] = useState<number | null>(null);
     const [help, setHelp] = useState(false);
-    const cameras = usePoll(signal => getCameras(signal), [], 30 * SECOND);
 
     const setZoom = useCallback((span: number) => {
         const next = clampZoom(span);
@@ -100,11 +98,9 @@ function CameraPlayer({ camera, start }: { camera: Camera, start: number | null 
     const dayLoaded = data.loaded.has(day);
     const noRecordings = dayLoaded && !data.spans.some(s => s.end > day && s.start < dayEnd);
 
-    const hasSide = cameras.type === 'ready' && cameras.data.length > 1;
-
     const aspect = camera.video ? camera.video.width / camera.video.height : 16 / 9;
 
-    return <div className={`player-page${hasSide ? ' has-cameras' : ''}`} style={{ '--ar': aspect } as React.CSSProperties}>
+    return <div className="player-page" style={{ '--ar': aspect } as React.CSSProperties}>
         <header className="player-header">
             <Link to="/" className="btn-icon" aria-label="All cameras" title="All cameras"><Icon name="arrowLeft" size={22} /></Link>
             <h1 className="player-title">{camera.name}</h1>
@@ -139,10 +135,6 @@ function CameraPlayer({ camera, start }: { camera: Camera, start: number | null 
             <div className="pc-transport"><Transport player={player} /></div>
             <div className="pc-options"><PlayOptions player={player} zoom={zoom} onZoom={setZoom} /></div>
         </section>
-
-        {hasSide && <aside className="player-side" aria-label="Cameras">
-            <CameraStrip cameras={cameras.data} current={camera.name} at={live ? null : time} />
-        </aside>}
 
         {help && <ShortcutsHelp onClose={() => setHelp(false)} />}
     </div>;
