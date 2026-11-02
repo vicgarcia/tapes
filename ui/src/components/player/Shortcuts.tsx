@@ -8,6 +8,9 @@ const SHORTCUTS: [string[], string][] = [
     [['[', ']'], 'Slower / faster (1× 2× 4×)'],
     [['1', '2', '4'], 'Set speed'],
     [['L'], 'Jump to live'],
+    [['+', '−'], 'Zoom timeline in / out'],
+    [['Z'], 'Cycle zoom 24h / 1h / 10m'],
+    [['PgUp', 'PgDn'], 'Previous / next day'],
     [['F'], 'Fullscreen'],
     [['?'], 'Show these shortcuts'],
 ];
@@ -48,6 +51,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
                     <dd>{label}</dd>
                 </div>)}
             </dl>
+            <p className="shortcuts-foot">Timeline: drag to scrub, click to jump, scroll or pinch to zoom. Scroll horizontally to pan.</p>
         </div>
     </div>;
 }
