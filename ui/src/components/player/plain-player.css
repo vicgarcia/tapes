@@ -1,4 +1,0 @@
-/* Only stacking and visibility; the full player layout follows separately. */
-.plain-player-stage { position: relative; width: 100%; }
-.plain-player-stage video { position: absolute; inset: 0; width: 100%; height: 100%; visibility: hidden; }
-.plain-player-stage video.is-visible { visibility: visible; }
