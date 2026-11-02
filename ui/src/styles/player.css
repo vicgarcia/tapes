@@ -3,8 +3,8 @@
     --ar: 1.7778;
     display: grid; height: 100vh; height: 100dvh; overflow: hidden;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
-    grid-template-areas: "header" "stage" "." "clock" "transport" "options";
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto auto auto;
+    grid-template-areas: "header" "stage" "side" "clock" "daynav" "strip" "timeline" "transport" "options";
     background: var(--bg);
 }
 .player-page.is-loading { display: grid; place-items: center; grid-template-areas: none; grid-template-rows: none; }
@@ -26,11 +26,19 @@
 .player-actions .status-pill { border: 1px solid transparent; }
 
 .player-stage { grid-area: stage; background: #000; position: relative; min-width: 0; min-height: 0; }
-.pc-clock, .pc-transport, .pc-options { background: var(--surface); min-width: 0; zoom: 0.8; }
+.pc-clock, .pc-daynav, .pc-strip, .pc-timeline, .pc-transport, .pc-options { background: var(--surface); min-width: 0; }
+/* Coordinate-based strips must not inherit control zoom. */
+.pc-clock, .pc-daynav, .pc-transport, .pc-options { zoom: 0.8; }
+.pc-daynav { grid-area: daynav; padding: 6px 12px; }
+.pc-strip { grid-area: strip; padding: 2px 16px 0; }
+.pc-timeline { grid-area: timeline; position: relative; }
+.player-side { grid-area: side; overflow: auto; padding: 12px 14px; }
+.clock.is-scrubbing .clock-time { color: var(--accent-strong); }
+.clock.is-scrubbing .clock-status { color: var(--accent); }
 .pc-clock { grid-area: clock; padding: 10px 16px 2px; border-top: 1px solid var(--border); }
 .pc-transport { grid-area: transport; padding: 2px 8px; }
 .pc-options { grid-area: options; padding: 2px 10px calc(8px + var(--safe-bottom)); }
-.play-options { display: flex; justify-content: center; gap: 8px; }
+.play-options { display: flex; justify-content: space-between; gap: 8px; }
 .play-options .segmented button { min-height: 32px; padding: 0 12px; text-transform: none; font-variant-numeric: tabular-nums; }
 .stage {
     position: relative; width: 100%; aspect-ratio: var(--ar); margin: 0 auto;
@@ -123,34 +131,104 @@
 
 @media (orientation: landscape) and (max-height: 540px) {
     .player-page {
-        grid-template-columns: min(calc(100dvh * var(--ar)), 62vw) minmax(0, 1fr);
-        grid-template-rows: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
-        grid-template-areas: "stage ." "stage clock" "stage transport" "stage options" "stage .";
+        --dock: 84px;
+        grid-template-columns: min(calc((100dvh - var(--dock)) * var(--ar)), 62vw) minmax(0, 1fr);
+        /* the column right of the video is all control surface, clock + transport centered in it */
+        grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto;
+        grid-template-areas:
+            "stage ."
+            "stage clock"
+            "stage transport"
+            "stage ."
+            "strip strip"
+            "timeline timeline";
         background: var(--surface);
     }
-    .player-header { display: none; }
+    .player-header, .player-side, .pc-daynav, .pc-options { display: none; }
     .player-stage { display: flex; align-items: center; justify-content: center; padding-left: var(--safe-left); }
-    .stage { width: var(--fit-w, 100%); height: var(--fit-h, auto); aspect-ratio: auto; }
+    .stage { width: 100%; max-height: 100%; }
     .stage-back, .stage-live { display: inline-flex; }
-    .pc-clock { border-top: 0; padding: 10px max(14px, var(--safe-right)) 0 14px; }
-    .pc-clock .clock { flex-direction: column; align-items: center; gap: 2px; }
+    .pc-clock { border-top: 0; padding: calc(10px + var(--safe-top)) max(14px, var(--safe-right)) 0 14px; }
+    .pc-clock .clock { flex-direction: column; align-items: flex-start; gap: 2px; }
     .pc-transport { padding: 6px max(8px, var(--safe-right)) 8px 8px; }
     .pc-transport .transport { flex-wrap: wrap; row-gap: 6px; }
+    .pc-strip { padding: 4px max(16px, var(--safe-right)) 0 max(16px, var(--safe-left)); border-top: 1px solid var(--border); }
+    .pc-timeline { padding-bottom: var(--safe-bottom); }
 }
+
+/* ---- desktop ------------------------------------------------------------- */
+
 @media (min-width: 960px) and (min-height: 541px) {
     .player-page {
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        grid-template-areas: "header header header" "stage stage stage" "clock transport options";
+        grid-template-columns: auto minmax(0, 1fr) auto 0;
+        grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+        grid-template-areas:
+            "header header header header"
+            "stage stage stage side"
+            "clock transport options side"
+            "daynav daynav daynav side"
+            "strip strip strip side"
+            "timeline timeline timeline side";
     }
+    .player-page.has-cameras { grid-template-columns: auto minmax(0, 1fr) auto 260px; }
     .player-header { padding-left: 12px; padding-right: 20px; height: 56px; }
-    .player-stage { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .btn-shortcuts { display: inline-flex; }
+    .player-stage { display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
     .stage { width: var(--fit-w, 100%); height: var(--fit-h, auto); aspect-ratio: auto; }
-    .pc-clock { padding: 14px 20px 10px 24px; display: flex; align-items: center; }
+    .pc-clock { padding: 14px 20px 10px 24px; border-top: 1px solid var(--border); display: flex; align-items: center; }
     .pc-transport { padding: 10px 8px; border-top: 1px solid var(--border); display: flex; justify-content: center; }
+    .pc-daynav { padding: 4px 24px 8px; }
     .pc-options { padding: 10px 20px 10px 8px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; }
+    .pc-options .play-options { gap: 12px; }
+    .pc-strip { padding: 6px 24px 0; }
+    .pc-timeline { padding: 0 8px 8px; }
     .clock-time { font-size: 1.6rem; }
     .clock { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .player-side { border-left: 1px solid var(--border); background: var(--surface); padding: 16px; }
 }
 /* Fullscreen must override the fitted desktop and landscape dimensions. */
 .stage:fullscreen { width: 100vw; height: 100dvh; aspect-ratio: auto; }
+
+/* ---- day strip ----------------------------------------------------------- */
+
+.daystrip { height: 24px; touch-action: none; cursor: pointer; }
+.daystrip svg { display: block; overflow: visible; }
+.ds-gap { fill: var(--gap-line); }
+.ds-span { fill: var(--recorded); }
+.ds-tick { stroke: var(--text-3); stroke-width: 1; }
+.ds-label { fill: var(--text-3); font-size: 8.5px; }
+.ds-window { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.2; }
+.ds-playhead { stroke: #fff; stroke-width: 2; }
+
+/* ---- timeline ------------------------------------------------------------ */
+
+.timeline {
+    position: relative; height: 56px; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none;
+    overflow: hidden;
+}
+.timeline:active { cursor: grabbing; }
+.timeline-svg { display: block; }
+.tl-span { fill: var(--recorded); }
+.tl-future { fill: none; stroke: var(--border); stroke-dasharray: 3 4; }
+.tl-tick { stroke: var(--text-3); stroke-width: 1; opacity: 0.6; }
+.tl-tick-major { stroke: var(--text-2); stroke-width: 1.2; }
+.tl-label { fill: var(--text-2); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+.tl-label-day { fill: var(--text); font-weight: 700; }
+.tl-midnight { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.7; }
+.tl-now line { stroke: var(--live); stroke-width: 2; }
+
+.timeline-playhead {
+    position: absolute; top: 13px; bottom: 3px; left: 50%; width: 2px; margin-left: -1px;
+    background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); pointer-events: none; border-radius: 1px;
+}
+.timeline-playhead span {
+    position: absolute; top: -6px; left: 50%; width: 12px; height: 12px; margin-left: -6px;
+    background: #fff; border-radius: 3px 3px 50% 50%; transform: rotate(0deg);
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 50% 100%, 0 45%);
+}
+.timeline.is-live .timeline-playhead, .timeline.is-live .timeline-playhead span { background: var(--live); }
+.timeline-empty {
+    position: absolute; left: 50%; top: 38px; transform: translate(-50%, -50%);
+    padding: 4px 12px; border-radius: 999px; background: rgba(10, 12, 15, 0.85); color: var(--text-2); font-size: 0.8rem;
+    pointer-events: none; white-space: nowrap;
+}

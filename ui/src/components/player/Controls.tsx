@@ -2,21 +2,22 @@ import { Icon } from '@app/components/common/Icon';
 import { PLAYBACK_RATES } from '@app/types';
 import { formatClock, formatDayShort, MINUTE } from '@app/lib/time';
 import { Player } from './usePlayer';
+import { ZOOM_PRESETS } from './zoom';
 
 /** Big wall-clock readout of the playhead. */
-export function Clock({ player, time }: { player: Player, time: number }) {
+export function Clock({ player, time, scrubbing }: { player: Player, time: number, scrubbing: boolean }) {
     const { state } = player;
-    const status = state.type === 'live' ? (state.status === 'playing' ? 'Live' : state.status === 'error' ? 'Live unavailable' : state.status === 'stalled' ? 'Buffering…' : 'Connecting…')
+    const status = scrubbing ? 'Release to play from here' : state.type === 'live' ? (state.status === 'playing' ? 'Live' : state.status === 'error' ? 'Live unavailable' : state.status === 'stalled' ? 'Buffering…' : 'Connecting…')
         : state.status === 'loading' ? 'Loading…'
         : state.status === 'buffering' ? 'Buffering…'
         : state.status === 'end' ? 'No recording'
         : state.playing ? (state.rate === 1 ? 'Playing' : `Playing ${state.rate}×`) : 'Paused';
 
-    return <div className="clock">
+    return <div className={`clock${scrubbing ? ' is-scrubbing' : ''}`}>
         <time className="clock-time" dateTime={new Date(time).toISOString()}>{formatClock(time)}</time>
         <div className="clock-meta">
             <span className="clock-date">{formatDayShort(time)}</span>
-            <span className={`clock-status${state.type === 'live' ? ' is-live' : ''}`}>{status}</span>
+            <span className={`clock-status${state.type === 'live' && !scrubbing ? ' is-live' : ''}`}>{status}</span>
         </div>
     </div>;
 }
@@ -58,7 +59,7 @@ export function LiveButton({ player }: { player: Player }) {
 }
 
 /** Segmented playback speed controls. */
-export function PlayOptions({ player }: { player: Player }) {
+export function PlayOptions({ player, zoom, onZoom }: { player: Player, zoom: number, onZoom: (span: number) => void }) {
     const { engine, state } = player;
     const live = state.type === 'live';
 
@@ -70,6 +71,13 @@ export function PlayOptions({ player }: { player: Player }) {
                 aria-pressed={state.rate === rate}
                 onClick={() => engine.setRate(rate)}
             >{rate}×</button>)}
+        </div>
+        <div className="segmented" role="group" aria-label="Timeline zoom" title="Zoom (+ / − / Z)">
+            {ZOOM_PRESETS.map(preset => {
+                const active = Math.abs(Math.log(zoom / preset.span)) < 0.35;
+                return <button key={preset.label} className={active ? 'is-active' : undefined} aria-pressed={active}
+                    onClick={() => onZoom(preset.span)}>{preset.label}</button>;
+            })}
         </div>
     </div>;
 }
