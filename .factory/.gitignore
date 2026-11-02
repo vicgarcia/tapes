@@ -1,2 +1,7 @@
 .env
 state/
+private-terms
+auth.json
+settings.json
+models-store.json
+sessions/

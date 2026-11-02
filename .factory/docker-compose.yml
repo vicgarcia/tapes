@@ -1,27 +1,29 @@
-# Runs this repo's factory. Build the image first, from the software-factory repo: ./factory build
+# Runs this repo's factory. Change tapes to this repo's name, so its containers and volumes are its own.
 name: tapes-factory
 services:
   factory:
-    image: software-factory:local
+    image: ghcr.io/vicgarcia/software-factory:latest
     # The one line a host changes to use another isolation option.
     privileged: true
     restart: unless-stopped
     stop_grace_period: 60s
-    env_file: .env
-    # environment:
+    # GH_TOKEN comes from the shell, and from .env instead if that sets it.
+    env_file:
+      - path: .env
+        required: false
+    # Optional settings are listed in the software-factory repo, in docs/using.md.
+    environment:
+      - FACTORY_HOST_TOKEN=${GH_TOKEN:-}
     #   - PI_MODEL=openai-codex/<model>
+    #   - PI_REVIEW_MODEL=openai-codex/<model>
     volumes:
       # This clone. Agents work in worktrees under .worktrees/.
       - ..:/workspace
       # The factory's databases and logs, git-ignored.
       - ./state:/state
-      # The Pi login, shared by every repo on this machine.
-      - factory-auth:/auth
+      # The model login: auth.json in a folder every repo's factory shares. FACTORY_AUTH_DIR=. in .env keeps it in .factory/.
+      - ${FACTORY_AUTH_DIR:-~/.factory}:/auth
       # A named volume, because a Windows bind can't back the overlay driver.
       - docker-data:/var/lib/docker
 volumes:
-  # Created by ./factory login. External, so `down -v` can't delete it.
-  factory-auth:
-    external: true
-    name: software-factory-auth
   docker-data:
