@@ -1,295 +1,151 @@
-I've been tinkering with IP cameras at home for years. What started as a single camera monitoring the driveway turned into a multi-camera system, and with it came the realization that commercial solutions were either too expensive, too limited, or required subscriptions that felt unnecessary. I wanted something simple: capture video from my cameras continuously, store it efficiently, and make it available for whatever I needed—whether that was viewing in HomeKit, running AI detection, or just reviewing footage when the neighbor's cat set off the motion sensor again.
+I've been tinkering with IP cameras at home for years. What started as a single camera watching the driveway turned into a multi-camera system, and with it came the realization that commercial solutions were either too expensive, too limited, or required subscriptions that felt unnecessary. I wanted something simple: capture video from my cameras continuously, store it efficiently, and make it available for whatever I needed—whether that was viewing in HomeKit, running AI detection, or just reviewing footage when the neighbor's cat set off the motion sensor again.
 
-tapes is the result of that journey. It's built around a straightforward idea: use proven open-source tools to capture RTSP streams from IP cameras, save continuous recordings in manageable interval files, and provide a foundation for everything else. The recordings become source material for AI-based event detection, live viewing through HomeKit, or simply browsing through footage when you need to see what happened last Tuesday afternoon.
+tapes is the result of that journey. It's built around a straightforward idea: use proven open-source tools to capture RTSP streams from IP cameras, save continuous recordings in manageable interval files, and provide a foundation for everything else. The recordings become source material for external AI analysis, live viewing through HomeKit, or simply browsing through footage when you need to see what happened last Tuesday afternoon.
 
 This isn't trying to be a complete commercial NVR replacement with every feature imaginable. Instead, it's a solid foundation that handles the core job well—continuous recording with a clean web interface—and stays out of your way when you want to build on top of it. The system has been running in production for months, quietly doing its job while I've refined the pieces that matter.
 
-Recent improvements have simplified the architecture significantly: MediaMTX now handles recording natively using crash-resilient fragmented MP4 files, automatic retention management keeps disk usage in check, and structured logging makes debugging straightforward. The result is a cleaner, more reliable system that just works.
+MediaMTX now handles both recording and native playback. There are no generated thumbnails or background file-processing jobs: camera previews are on-demand snapshots held in memory.
 
 ## Overview
 
-tapes is built on three core components that work together:
+- **MediaMTX** pulls RTSP camera streams, records fragmented MP4, serves live HLS and recorded MP4, and expires old recordings.
+- **tapes** is a Go API with an embedded React/TypeScript UI. It discovers cameras through MediaMTX, authenticates viewers, and proxies video. ffmpeg captures on-demand JPEG previews.
+- **Storage** belongs to MediaMTX only. The tapes container does not need a recordings mount or a database.
 
-- **mediamtx proxy**: Proxies your IP camera RTSP streams and handles native continuous recording
-- **web application**: Go backend with React frontend for browsing and viewing recordings and live video
-- **disk storage**: Simple file-based storage with automatic thumbnail generation and retention management
+## Setup
 
-Everything runs in Docker containers orchestrated by docker-compose for easy deployment and management.
+You need Docker with the Compose plugin, RTSP cameras, and disk space for recordings.
 
-## What You Need
-
-Before you begin, you'll need:
-
-- A Linux server (Ubuntu/Debian recommended) with Docker
-- One or more IP cameras with RTSP streams
-
-## Setup and Install
-
-### 1. Prepare the Filesystem
-
-Create the directory structure for your camera recordings:
+### 1. Download configuration
 
 ```bash
-sudo mkdir -p /path/to/cameras/{garage,kitchen}
+mkdir -p ~/tapes && cd ~/tapes
+curl -O https://raw.githubusercontent.com/vicgarcia/tapes/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/vicgarcia/tapes/main/mediamtx.yml
+curl -o .env https://raw.githubusercontent.com/vicgarcia/tapes/main/.env.template
 ```
 
-Replace `garage` and `kitchen` with your actual camera names. The structure will look like:
-
-```
-/path/to/cameras/
-├── garage/
-└── kitchen/
-```
-
-MediaMTX will create video files directly in each camera directory—no subdirectories needed.
-
-### 2. Download Configuration Files
-
-Create the installation directory and download required files:
+Edit `.env` and set **both** `JWT_KEY` and `MEDIAMTX_PASS` to separate random secrets:
 
 ```bash
-mkdir -p ~/tapes
-cd ~/tapes
-
-# Download docker-compose configuration
-curl -o docker-compose.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/docker-compose.yml
-
-# Download environment template
-curl -o .env.template https://raw.githubusercontent.com/vicgarcia/tapes/main/.env.template
-
-# Download MediaMTX configuration
-curl -o mediamtx.yml https://raw.githubusercontent.com/vicgarcia/tapes/main/mediamtx.yml
+openssl rand -hex 32  # JWT_KEY
+openssl rand -hex 16  # MEDIAMTX_PASS
 ```
 
-### 3. Configure Environment Variables
+Compose gives the API and MediaMTX the same `MEDIAMTX_PASS`; the internal username is `tapes`. Optional `UID` and `GID` default to `1000:1000`. `TZ` defaults to UTC for tapes; MediaMTX uses the host's mounted timezone files. See [API.md](API.md) for API configuration.
 
-Create your environment configuration:
+### 2. Create the password file
+
+Using `htpasswd` (from your distribution's Apache utilities):
 
 ```bash
-cp .env.template .env
-nano .env
+htpasswd -c passwords admin
+htpasswd passwords viewer  # optional additional user; do not use -c again
 ```
 
-Edit the `.env` file with your settings:
+The supplied Compose file mounts `./passwords` read-only at `/opt/tapes/passwords`. Ensure the configured container user can read it.
 
-```bash
-# Required
-JWT_KEY=your-secret-key-here              # Generate with: openssl rand -hex 32
+### 3. Add cameras and persistent storage
 
-# Optional (defaults shown)
-STORAGE_PATH=/path/to/cameras             # Path to camera recordings
-PASSWORDS_PATH=/path/to/passwords         # Path to htpasswd file
-JWT_ISSUER=tapes                          # JWT issuer identifier
-DEBUG=false                               # Enable debug logging (true/false)
-RETENTION_DAYS=90                         # Auto-delete after 90 days (0=keep forever)
-```
-
-**Important**: Generate a secure JWT_KEY with `openssl rand -hex 32` - don't use a simple password.
-
-### 4. Create Authentication File
-
-Create a password file for web interface access:
-
-```bash
-cd ~/tapes
-htpasswd -c passwords admin        # Create file with first user
-htpasswd passwords viewer          # Add additional users
-```
-
-### 5. Configure MediaMTX
-
-Edit the MediaMTX configuration at `mediamtx.yml`:
+Edit `paths` in `mediamtx.yml`:
 
 ```yaml
 paths:
   garage:
     source: rtsp://user:password@192.168.1.101:554/live/ch0
-    sourceProtocol: tcp
-
   kitchen:
     source: rtsp://user:password@192.168.1.102:554/live/ch0
-    sourceProtocol: tcp
 ```
 
-That's it! MediaMTX handles recording automatically using the global defaults already configured in `mediamtx.yml`:
-
-- **Native recording**: Built-in recording (no FFmpeg needed)
-- **Format**: Fragmented MP4 (fmp4) - resilient to crashes
-- **Segment duration**: 5-minute video files
-- **Part duration**: 1-second disk flush (max 1s data loss on crash)
-- **Retention**: Auto-delete after 90 days (configurable)
-- **Filename format**: `YYYYMMDDHHMMSS.mp4` (e.g., `20251109143000.mp4`)
-
-Simply add your camera's RTSP URL and MediaMTX handles the rest.
-
-### 6. Edit Docker Compose Volumes
-
-Edit `docker-compose.yml` to match your camera storage path and passwords file location:
-
-```bash
-nano docker-compose.yml
-```
-
-Update the volume paths in both the `mediamtx` and `tapes` services:
+Add a persistent recordings mount to the **mediamtx** service in `docker-compose.yml` (the downloaded file does not include one):
 
 ```yaml
-services:
-  mediamtx:
     volumes:
-      - ./mediamtx.yml:/mediamtx.yml:ro
-      - /path/to/cameras:/cameras        # Update this path
-
-  tapes:
-    volumes:
-      - /path/to/cameras:/cameras        # Update this path
-      - ~/tapes/passwords:/opt/tapes/passwords:ro
+      # Keep the existing timezone and mediamtx.yml mounts too.
+      - /srv/tapes/recordings:/cameras
 ```
 
-Replace `/path/to/cameras` with the actual path you created in step 1.
+Make the parent storage directory writable by the configured UID/GID. **Do not create individual camera folders**; MediaMTX creates them. Do not add this mount to tapes.
 
-### 7. Start the System
+Defaults record five-minute fMP4 segments, flushing parts every second, at `/cameras/%path/%Y%m%d%H%M%S-%f%z.mp4`. The fractional seconds are required for playback; the timezone offset distinguishes repeated local times at the end of daylight saving time.
 
-Launch both MediaMTX and tapes with docker-compose:
+### 4. Start
 
 ```bash
-docker-compose up -d
+docker compose up -d
+docker compose ps
+docker compose logs
 ```
 
-Check that everything is running:
+Open `http://<server-ip>:8671`. Images are pulled from the registries; no local build is required. Port 8554 exposes read-only RTSP without a password in the supplied configuration. Restrict it to trusted networks; do not expose internal MediaMTX HTTP services publicly.
 
-```bash
-docker-compose ps
-docker-compose logs
-```
+## Usage
 
-The web application will be available at `http://<server ip>:8671`.
+Sign in with your password-file credentials. The home page shows camera snapshots and connection status. Open a camera for live video, select a day, and click or drag the timeline to review recordings. Zoom between 24h, 1h and 10m; gaps indicate missing footage. Use Live to return to the current stream, and `?` for keyboard shortcuts.
 
-The pre-built tapes image will be automatically pulled from GitHub Container Registry (ghcr.io), saving you 10-15 minutes of build time with OpenCV.
+Recorded playback uses MediaMTX's native MP4 output through the API, not transcoding. Live playback uses native HLS where supported and hls.js elsewhere. Browser codec support still matters; H.264 is the safest camera setting.
 
-## Using tapes
+On HTTPS (or localhost), supported browsers can install tapes as a home-screen app. Only the application shell is cached, never footage or API responses. Offline mode cannot play recordings. Updates prompt before reloading so they do not interrupt viewing.
 
-Once running, open `http://<server ip>:8671` in your browser:
+## Storage and retention
 
-1. **Login** with credentials from your htpasswd file
-2. **Select Camera** from the dropdown
-3. **Choose Date** to browse recordings
-4. **Click thumbnails** to play videos
+MediaMTX is the **only** thing that deletes recordings, using `recordDeleteAfter` in `mediamtx.yml`. Deletion is by age only, with **no disk limit**. The default is `90d`; use `0s` to keep forever. It only cleans cameras still listed in `mediamtx.yml`, so a removed camera's folder must be deleted by hand.
 
-The interface automatically generates thumbnails for all videos hourly. Recordings are played as native H.264 video in your browser. Videos are stored in 5-minute segments, making it easy to find exactly what you need.
+Check free disk space regularly (`df -h /srv/tapes/recordings`) and size storage for the aggregate bitrate and retention period. A continuous 2–4 Mbps stream uses roughly 22–43 GB per day per camera, before overhead. The UI does not manage retention or remove files.
 
-## Production Deployment
+## Reverse proxy
 
-### Storage Management
-
-Monitor disk usage regularly:
-
-```bash
-df -h /path/to/cameras
-```
-
-With 5-minute segments, storage usage depends on your bitrate. Typical cameras at 2-4 Mbps use roughly:
-
-- **Per camera**: 1-2 GB per day, 30-60 GB per month
-- **Three cameras**: 3-6 GB per day, 90-180 GB per month
-
-By default, tapes automatically deletes recordings older than 90 days. You can adjust this in `.env`:
-
-```bash
-RETENTION_DAYS=90    # Auto-delete after 90 days
-RETENTION_DAYS=0     # Keep forever (disable auto-deletion)
-```
-
-Note that MediaMTX also has its own retention setting in `mediamtx.yml` (`recordDeleteAfter`). Both can run independently—set them to match for consistency.
-
-### Reverse Proxy
-
-For SSL and domain access, use nginx:
+Terminate TLS at a reverse proxy. Give clip preparation a long read timeout and disable response buffering for live HLS:
 
 ```nginx
 server {
     listen 443 ssl;
-    server_name cameras.yourdomain.com;
-
+    server_name cameras.example.com;
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
 
     location / {
-        proxy_pass http://localhost:8671;
+        proxy_pass http://127.0.0.1:8671;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 300s;
+        # Applies to live playlists and parts as well as other responses.
+        proxy_buffering off;
     }
 }
 ```
 
-## Architecture Details
+Keep the API and media routes on the same origin; authentication uses a cookie. Do not configure shared caching for authenticated responses. See [API.md](API.md) for the cookie's current security flags.
 
-### File Naming Convention
+## Upgrading from the older recording layout
 
-- **Recordings**: `YYYYMMDDHHMMSS.mp4` (timestamp when segment started)
-- **Thumbnails**: `.jpg` files with matching names
+1. Back up configuration, credentials, and recordings, then stop the stack (`docker compose down`).
+2. Download the new `docker-compose.yml` and `mediamtx.yml`. Move your camera paths into the new MediaMTX configuration and restore the persistent recordings mount on MediaMTX only. Preserve any other deployment-specific settings deliberately.
+3. Set `MEDIAMTX_PASS` in `.env` and keep a strong `JWT_KEY`.
+4. If you changed `RETENTION_DAYS`, set the same period in `recordDeleteAfter` (for example, `30d`). The old variable is ignored; the new default is 90 days. An old value of `0` becomes `0s`, keeping recordings forever.
+5. Download `scripts/migrate-recordings.sh` from this repository and run it while the stack is stopped, with `TZ` set to the zone recordings were written in. Start with a dry run:
 
-### API Endpoints
+   ```bash
+   TZ=America/New_York DRY_RUN=1 bash scripts/migrate-recordings.sh /srv/tapes/recordings
+   TZ=America/New_York bash scripts/migrate-recordings.sh /srv/tapes/recordings
+   ```
 
-All endpoints require JWT authentication:
-
-- `POST /login` - Authenticate with htpasswd credentials
-- `GET /cameras` - List available cameras
-- `GET /cameras/{camera}/recordings?day=YYYY-MM-DD` - Get recordings for date
-- `GET /cameras/{camera}/recordings/{timestamp}/video` - Stream recording
-- `GET /cameras/{camera}/recordings/{timestamp}/thumbnail` - Get thumbnail
-
-### Camera snapshots
-
-Authenticated `GET /cameras/{camera}/snapshot` returns a JPEG with `Cache-Control: no-store`
-and an RFC3339 `X-Snapshot-Time`. Unknown cameras and cameras without a captured frame
-return 404. Snapshots are grabbed only on request from `MEDIAMTX_RTSP_URL`
-(default `rtsp://mediamtx:8554`) using ffmpeg. Results, including failures, are cached
-for five seconds; requests share a grab per camera, with at most two grabs running.
-Grabs time out after ten seconds. A failed refresh serves the last good in-memory
-frame with its original timestamp. No snapshot files are written.
-
-### Background Processing
-
-tapes runs an hourly background task that:
-
-- Scans all camera directories for video files
-- Generates thumbnails for any videos missing them using OpenCV
-- Skips the most recent file (may still be recording)
-- Deletes videos older than RETENTION_DAYS (default: 90 days)
-- Removes zero-byte files (corrupted recordings)
-
-All processing is logged with structured output for easy monitoring.
+   The script requires Bash and GNU `date`. It renames old `YYYYMMDDHHMMSS.mp4` files to the fractional-second/offset format and removes matching old JPEG thumbnails. Already migrated names are left alone; unknown files and existing targets are skipped. Review all output. Files from before the **December 2025 MediaMTX timezone fix** may have been named in UTC; migrate those with `TZ=UTC`, separately if necessary. Ambiguous local times need manual verification. Anything not migrated **won't appear in the UI and is never deleted**.
+6. `STORAGE_PATH`, `RETENTION_DAYS`, and generated thumbnails are gone. Remove the old variables and any recordings mount on tapes. Restart with `docker compose up -d` and verify playback and disk persistence.
 
 ## Development
 
-### Local Development Setup
-
-If you want to modify the code, clone the repository:
+The repository contains `api/` (Go), `ui/` (React/TypeScript), and `test/` (disposable integration stack). [CLAUDE.md](CLAUDE.md) covers architecture and development constraints; [API.md](API.md) documents the HTTP interface.
 
 ```bash
 git clone https://github.com/vicgarcia/tapes.git
 cd tapes
+./test.sh        # UI build/lint/tests, Go vet/race tests, image build, integration checks
+./test.sh ui     # or api / stack
 ```
 
-### Building Locally
+Tests require Docker/Compose and run dependencies and builds in containers with disposable volumes, without installing dependencies into the checkout. In the Software Factory, use `factory-test [ui|api|stack]` instead; it holds the test lock and invokes `test.sh`.
 
-To build the Docker image locally for development:
+`docker build -t tapes:local .` builds the production image: Node builds the UI, Go embeds `api/dist`, and Alpine supplies ffmpeg. To deploy that build, explicitly change the tapes image in Compose to `tapes:local`.
 
-```bash
-docker build -t ghcr.io/vicgarcia/tapes:local .
-```
-
-This creates a local image with the tag `local` that docker-compose will use instead of pulling from the registry. The build takes 10-15 minutes due to OpenCV compilation.
-
-### Development Commands
-
-```bash
-# Frontend development
-cd ui && npm run dev
-
-# Backend development
-cd api && go run .
-
-# Code formatting
-npm run lint && go fmt ./...
-```
+For interactive UI work, run the UI's `npm run dev` in a Node container with dependencies in a container volume. `TAPES_API_URL` selects the backend proxy target (default `http://localhost:8671`, relative to that container). Go needs `api/dist` present for its embed directive; build the UI first or use the test workflow's embed fixture. The UI uses hash routes, separate from server API paths.
