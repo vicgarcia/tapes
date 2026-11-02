@@ -2,9 +2,6 @@
 node_modules
 dist
 
-# go app build
-tapes
-
 # local development
 .env
 passwords
