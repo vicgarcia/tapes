@@ -13,6 +13,9 @@ const { outputFiles } = await build({
                 if (!(index in h.states)) h.states[index] = typeof initial === 'function' ? initial() : initial;
                 return [h.states[index], value => { h.states[index] = value; }];
             };
+            export const createContext = value => ({ value, Provider: {} });
+            export const createElement = (provider, props) => { provider.value = props.value; };
+            export const useContext = context => context.Provider.value ?? context.value;
             export const useCallback = fn => fn;
             export const useEffect = fn => globalThis.harness.effects.push(fn);
         ` : `export const useRegisterSW = options => {
@@ -22,7 +25,7 @@ const { outputFiles } = await build({
         };` }));
     } }],
 });
-const { useInstallOffer, useAppUpdate } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
+const { InstallOfferProvider, useInstallOffer, useAppUpdate } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`);
 
 function setup({ ios = false, standalone = false, dismissed = false, storageBlocked = false } = {}) {
     const h = globalThis.harness = { cursor: 0, states: [], effects: [], refresh: false };
@@ -44,7 +47,11 @@ function setup({ ios = false, standalone = false, dismissed = false, storageBloc
         getItem: key => { if (storageBlocked) throw Error('blocked'); return storage.get(key); },
         setItem: (key, value) => { if (storageBlocked) throw Error('blocked'); storage.set(key, value); },
     };
-    const render = hook => { h.cursor = 0; h.effects = []; return hook(); };
+    const render = hook => {
+        h.cursor = 0; h.effects = [];
+        if (hook === useInstallOffer) InstallOfferProvider({ children: null });
+        return hook();
+    };
     return { h, listeners, timers, storage, render };
 }
 
@@ -62,6 +69,27 @@ test('Chromium install offer uses the browser prompt and persists dismissal', as
     assert.equal(prompted, true);
     assert.equal(storage.get('tapes.install-dismissed'), '1');
     assert.equal(render(useInstallOffer).type, 'none');
+    cleanup();
+    assert.equal(listeners.size, 0);
+});
+
+test('app-lifetime provider retains eligibility before home mounts and across camera navigation', async () => {
+    const { render, listeners } = setup();
+    // Start the provider on login without rendering a banner consumer.
+    render(() => InstallOfferProvider({ children: 'login' }));
+    const cleanup = harness.effects[0]();
+    let prompted = 0;
+    listeners.get('beforeinstallprompt')({ preventDefault() {},
+        prompt: async () => { prompted++; }, userChoice: Promise.resolve({ outcome: 'accepted' }) });
+    render(() => InstallOfferProvider({ children: 'home' }));
+    assert.equal(useInstallOffer().type, 'prompt');
+    // Removing the home/banner must not discard the deferred browser event.
+    render(() => InstallOfferProvider({ children: 'camera' }));
+    render(() => InstallOfferProvider({ children: 'home' }));
+    await useInstallOffer().install();
+    assert.equal(prompted, 1);
+    render(() => InstallOfferProvider({ children: 'home' }));
+    assert.equal(useInstallOffer().type, 'none');
     cleanup();
     assert.equal(listeners.size, 0);
 });

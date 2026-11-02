@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -31,8 +31,20 @@ export type InstallOffer =
     | { type: 'prompt', install: () => Promise<void>, dismiss: () => void }   // Chromium: beforeinstallprompt
     | { type: 'ios', dismiss: () => void }                                    // Safari: Share → Add to Home Screen
 
+const InstallOfferContext = createContext<InstallOffer>({ type: 'none' });
+
+/** Keeps install eligibility alive across login and camera navigation. */
+export function InstallOfferProvider({ children }: { children: ReactNode }) {
+    const offer = useInstallEligibility();
+    return createElement(InstallOfferContext.Provider, { value: offer }, children);
+}
+
 /** Whether (and how) the app can be installed to the home screen. */
 export function useInstallOffer(): InstallOffer {
+    return useContext(InstallOfferContext);
+}
+
+function useInstallEligibility(): InstallOffer {
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
     const [dismissed, setDismissed] = useState(wasDismissed);
     const [installed, setInstalled] = useState(isStandalone);
