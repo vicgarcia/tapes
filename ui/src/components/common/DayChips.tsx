@@ -32,11 +32,11 @@ export function DayChips({ selected, onSelect, label = 'Day' }: DayChipsProps) {
         const root = strip.current, end = sentinel.current;
         if (!root || !end) return;
         const observer = new IntersectionObserver(entries => {
-            if (entries.some(e => e.isIntersecting)) setCount(c => c + PAGE);
+            if (entries.some(e => e.isIntersecting)) setCount(c => Math.max(c, total) + PAGE);
         }, { root, rootMargin: '0px 400px 0px 0px' });
         observer.observe(end);
         return () => observer.disconnect();
-    }, []);
+    }, [total]);
 
     // keep the selected chip in view
     useLayoutEffect(() => {

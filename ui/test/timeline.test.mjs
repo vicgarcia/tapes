@@ -76,3 +76,44 @@ test('day cache grows current spans, joins midnight, refreshes, isolates cameras
         h.visible = false; render(); assert.equal(h.effect(), undefined);
     } finally { Date.now = realNow; delete globalThis.h; }
 });
+
+test('failed historical days retry without navigation and stop polling after recovery', async () => {
+    const day = new Date(2000, 0, 1).getTime();
+    const otherDay = new Date(2000, 0, 2).getTime();
+    let timer = null;
+    globalThis.window = { setTimeout(fn, ms) { timer = { fn, ms }; return 1; }, clearTimeout() { timer = null; } };
+    const calls = [];
+    let failing = true;
+    const h = globalThis.h = { cache: { current: new Map() }, visible: true, updates: 0,
+        fetch: async (_, requested) => {
+            calls.push(requested);
+            if (requested === day && failing) throw new Error('temporary failure');
+            return [];
+        } };
+    const warn = console.warn;
+    console.warn = () => {};
+    const render = () => useDayData('test', [day, otherDay], Date.now());
+    try {
+        render();
+        const cleanup = h.effect();
+        await flush();
+        assert.deepEqual([...render().loaded], [otherDay]);
+        assert.equal(timer.ms, 30000);
+        // Keep failing for another cycle; successful historical days stay cached.
+        let retry = timer.fn; timer = null;
+        await retry();
+        assert.deepEqual(calls, [day, otherDay, day]);
+        assert.equal(timer.ms, 30000);
+        failing = false;
+        retry = timer.fn; timer = null;
+        await retry();
+        assert.deepEqual([...render().loaded], [day, otherDay]);
+        assert.equal(timer, null);
+        cleanup();
+        // Leaving the day cancels its scheduled retry as well.
+        h.cache.current.clear(); failing = true;
+        render(); const cancel = h.effect(); await flush();
+        assert.equal(timer.ms, 30000);
+        cancel(); assert.equal(timer, null);
+    } finally { console.warn = warn; delete globalThis.h; }
+});

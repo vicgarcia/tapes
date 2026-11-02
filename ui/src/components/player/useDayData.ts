@@ -51,7 +51,10 @@ export function useDayData(camera: string, days: number[], now: number): DayData
             }));
             if (controller.signal.aborted) return;
             if (due.length) setVersion(v => v + 1);
-            if (days.some(isToday)) timer = window.setTimeout(refresh, TODAY_REFRESH_MS);
+            // Historical requests can fail too: retry missing days until they load.
+            if (days.some(day => isToday(day) || !cache.current.has(`${camera}|${day}`))) {
+                timer = window.setTimeout(refresh, TODAY_REFRESH_MS);
+            }
         };
         refresh();
         return () => {
