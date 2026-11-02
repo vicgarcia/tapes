@@ -149,4 +149,3 @@ function lockLandscape() {
     const orientation = screen.orientation as LockableOrientation | undefined;
     orientation?.lock?.('landscape').catch(() => undefined);
 }
-
