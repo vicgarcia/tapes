@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isBadCredentials, useAuth } from "@app/services/auth";
-import { Icon } from "./common/Icon";
 
 export function Login() {
     const [username, setUsername] = useState('');
@@ -43,11 +42,7 @@ export function Login() {
     if (auth.status === 'checking') return null;
 
     return <main className="login">
-        <form className="login-card" onSubmit={submit} noValidate>
-            <div className="login-brand">
-                <span className="brand-mark"><Icon name="shield" size={26} /></span>
-                <h1>Tapes</h1>
-            </div>
+        <form className="login-card" aria-label="Sign in" onSubmit={submit} noValidate>
             <label className="field">
                 <span>Username</span>
                 <input
