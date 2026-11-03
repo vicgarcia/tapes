@@ -2,16 +2,23 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 
 	"github.com/vicgarcia/tapes/internal/auth"
 	"github.com/vicgarcia/tapes/internal/cameras"
+	"github.com/vicgarcia/tapes/internal/logger"
 	"github.com/vicgarcia/tapes/internal/mediamtx"
 )
+
+// proxiedHeaders are the upstream HLS headers passed to the browser. Anything
+// else, such as MediaMTX's CORS or cookie headers, stays on the internal hop.
+var proxiedHeaders = []string{"Content-Type", "Content-Length", "Cache-Control", "Last-Modified", "ETag"}
 
 // jsonError writes a JSON error response with the given status code.
 func jsonError(w http.ResponseWriter, status int, msg string) {
@@ -20,10 +27,38 @@ func jsonError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-// HealthHandler returns the status used by health checks.
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
+// writeJSON writes v as a JSON response, logging encoding failures.
+func writeJSON(w http.ResponseWriter, r *http.Request, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, `{"status":"success"}`)
+	if err := json.NewEncoder(w).Encode(v); err != nil && r.Context().Err() == nil {
+		logger.Error("json response failed", "path", r.URL.Path, "error", err)
+	}
+}
+
+// requireCamera writes 404 for an unknown camera and 502 when MediaMTX can't be
+// asked, returning whether the request may continue.
+func requireCamera(w http.ResponseWriter, r *http.Request) bool {
+	name := mux.Vars(r)["camera"]
+	_, err := cameras.GetByName(r.Context(), name)
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, cameras.ErrNotFound):
+		jsonError(w, http.StatusNotFound, "camera not found")
+	case r.Context().Err() != nil:
+		// The client went away; there is no one to answer.
+	default:
+		logger.Error("camera lookup failed", "camera", name, "error", err)
+		jsonError(w, http.StatusBadGateway, "mediamtx unavailable")
+	}
+	return false
+}
+
+// HealthHandler returns the status used by health checks, and the app time zone the UI
+// uses for days and clock labels. It is public because the UI needs it before login.
+func HealthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, r, map[string]string{"status": "success", "timezone": time.Local.String()})
 }
 
 // AuthHandler returns success when the authentication cookie is valid.
@@ -34,21 +69,26 @@ func AuthHandler(w http.ResponseWriter, r *http.Request) {
 
 // LoginHandler sets the authentication cookie after validating credentials.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	_ = r.ParseForm()
-	p, e := auth.GetPasswd()
-	if e != nil {
-		jsonError(w, 500, "login failed")
-		return
-	}
 	u, pw := r.FormValue("username"), r.FormValue("password")
+	p, err := auth.GetPasswd()
+	if err != nil {
+		logger.Error("password file unreadable", "error", err)
+		jsonError(w, http.StatusInternalServerError, "login failed")
+		return
+	}
 	if u == "" || pw == "" || !p.Match(u, pw) {
-		http.Error(w, "login failed", 401)
+		logger.Info("login rejected", "username", u, "remote_addr", r.RemoteAddr)
+		http.Error(w, "login failed", http.StatusUnauthorized)
 		return
 	}
-	if e = auth.SetCookie(w, u); e != nil {
-		http.Error(w, "login failed", 401)
+	if err = auth.SetCookie(w, u); err != nil {
+		logger.Error("auth cookie failed", "username", u, "error", err)
+		http.Error(w, "login failed", http.StatusUnauthorized)
 		return
 	}
+	logger.Info("login", "username", u, "remote_addr", r.RemoteAddr)
 	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, `{"status":"success"}`)
 }
@@ -62,72 +102,87 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // CamerasHandler returns the available cameras.
 func CamerasHandler(w http.ResponseWriter, r *http.Request) {
-	cs, e := cameras.GetAll()
-	if e != nil {
-		jsonError(w, 502, "mediamtx unavailable")
+	cs, err := cameras.GetAll(r.Context())
+	if err != nil {
+		if r.Context().Err() == nil {
+			logger.Error("camera list failed", "error", err)
+			jsonError(w, http.StatusBadGateway, "mediamtx unavailable")
+		}
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(cs)
+	writeJSON(w, r, cs)
 }
 
 // CameraHandler returns a camera by name.
 func CameraHandler(w http.ResponseWriter, r *http.Request) {
-	c, e := cameras.GetByName(mux.Vars(r)["camera"])
-	if e != nil {
-		if _, x := cameras.GetAll(); x != nil {
-			jsonError(w, 502, "mediamtx unavailable")
-		} else {
-			jsonError(w, 404, "camera not found")
-		}
-		return
+	name := mux.Vars(r)["camera"]
+	c, err := cameras.GetByName(r.Context(), name)
+	switch {
+	case err == nil:
+		writeJSON(w, r, c)
+	case errors.Is(err, cameras.ErrNotFound):
+		jsonError(w, http.StatusNotFound, "camera not found")
+	case r.Context().Err() == nil:
+		logger.Error("camera lookup failed", "camera", name, "error", err)
+		jsonError(w, http.StatusBadGateway, "mediamtx unavailable")
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(c)
 }
 
 // LiveStreamHandler proxies an HLS live stream from MediaMTX.
 func LiveStreamHandler(w http.ResponseWriter, r *http.Request) {
-	camera := mux.Vars(r)["camera"]
-	if _, e := cameras.GetByName(camera); e != nil {
-		jsonError(w, 404, "camera not found")
+	if !requireCamera(w, r) {
 		return
 	}
+	camera := mux.Vars(r)["camera"]
 	suffix := strings.TrimPrefix(r.URL.Path, "/cameras/"+camera+"/live/")
 	for _, part := range strings.Split(suffix, "/") {
 		if part == ".." {
-			jsonError(w, 400, "invalid path")
+			jsonError(w, http.StatusBadRequest, "invalid path")
 			return
 		}
 	}
 	target := mediamtx.HLSURL(camera, suffix, r.URL.Query())
-	req, e := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
-	if e != nil {
-		jsonError(w, 502, "stream unavailable")
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
+	if err != nil {
+		logger.Error("live proxy request invalid", "camera", camera, "path", suffix, "error", err)
+		jsonError(w, http.StatusBadGateway, "stream unavailable")
 		return
 	}
 	req.Header.Set("User-Agent", r.Header.Get("User-Agent"))
-	client := &http.Client{Timeout: 0, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if req.URL.Host != mediamtx.HLSHost() {
+	// No client timeout: low-latency HLS holds playlist requests open until new parts exist.
+	// Redirects are followed only back to MediaMTX, which answers the first playlist with one.
+	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if req.URL.Host != mediamtx.HLSHost() || len(via) >= 3 {
 			return http.ErrUseLastResponse
 		}
 		return nil
 	}}
-	resp, e := client.Do(req)
-	if e != nil {
-		jsonError(w, 502, "stream unavailable")
+	resp, err := client.Do(req)
+	if err != nil {
+		if r.Context().Err() == nil {
+			logger.Error("live proxy failed", "camera", camera, "path", suffix, "error", err)
+			jsonError(w, http.StatusBadGateway, "stream unavailable")
+		}
 		return
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		jsonError(w, 502, "stream unavailable")
+	// Upstream auth failures must not look like an expired login, and redirects
+	// elsewhere are never handed to the browser.
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || (resp.StatusCode >= 300 && resp.StatusCode < 400) {
+		logger.Error("live proxy refused", "camera", camera, "path", suffix, "status", resp.StatusCode)
+		jsonError(w, http.StatusBadGateway, "stream unavailable")
 		return
 	}
-	for k, v := range resp.Header {
-		for _, x := range v {
-			w.Header().Add(k, x)
+	if resp.StatusCode >= 500 {
+		logger.Error("live proxy upstream error", "camera", camera, "path", suffix, "status", resp.StatusCode)
+	}
+	for _, key := range proxiedHeaders {
+		if value := resp.Header.Get(key); value != "" {
+			w.Header().Set(key, value)
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil && r.Context().Err() == nil {
+		logger.Error("live proxy copy failed", "camera", camera, "path", suffix, "error", err)
+	}
 }
