@@ -11,6 +11,7 @@ passwords
 # Documentation
 *.md
 !README.md
+docs/
 
 # Data directories
 data/
