@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 # Resolve paths from the repository root, even when invoked elsewhere.
 cd "$(dirname "$0")"
+# Git Bash on Windows rewrites container paths such as /src unless told not to.
+export MSYS_NO_PATHCONV=1
 source test/checks.sh
 
 # Validate the stage before creating any test resources.
@@ -199,6 +201,7 @@ stack() {
 
  check 'MediaMTX stream ready' equal true wait_ready
  check 'Health' equal 200 curl_stack -o /dev/null -w '%{http_code}' http://tapes:8671/health
+ check 'Health time zone' equal '{"status":"success","timezone":"America/New_York"}' curl_stack -fsS http://tapes:8671/health
 
  # Every protected route must reject requests without a cookie.
  for path in /auth /logout /cameras /cameras/nope /cameras/test/live/index.m3u8 /cameras/test/recordings /cameras/test/playback /cameras/test/snapshot; do

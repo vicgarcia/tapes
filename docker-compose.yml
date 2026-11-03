@@ -13,6 +13,8 @@ services:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
       - ./mediamtx.yml:/mediamtx.yml:ro
+      # Recordings. Create the folder as the UID/GID above before starting, or Docker creates it owned by root.
+      - ./data/cameras:/cameras
 
   tapes:
     image: ghcr.io/vicgarcia/tapes:latest

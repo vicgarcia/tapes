@@ -1,6 +1,6 @@
 import { memo, useLayoutEffect, useRef, useState } from 'react';
 import { Span } from '@app/types';
-import { addDays, formatHour } from '@app/lib/time';
+import { addDays, atHour, formatHour } from '@app/lib/time';
 
 // Whole-day overview above the zoomed timeline: the day's recordings
 // at a glance, the playhead, and a bracket for the zoomed range.
@@ -58,11 +58,7 @@ export const DayStrip = memo(function DayStrip(props: DayStripProps) {
 
     const H = 24, BAR_Y = 3, BAR_H = 10;
     const recordedTo = Math.min(now, dayEnd);
-    const hours = [6, 12, 18].map(h => {
-        const date = new Date(day);
-        date.setHours(h);
-        return date.getTime();
-    });
+    const hours = [6, 12, 18].map(h => atHour(day, h));
 
     return <div ref={ref} className="daystrip" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { dragging.current = null; props.onScrub(null); }}
         aria-label="Day overview" role="slider" aria-valuenow={Math.round(time / 1000)}>

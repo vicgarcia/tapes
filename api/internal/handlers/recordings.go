@@ -13,8 +13,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/vicgarcia/tapes/internal/cameras"
 	"github.com/vicgarcia/tapes/internal/env"
+	"github.com/vicgarcia/tapes/internal/logger"
 	"github.com/vicgarcia/tapes/internal/mediamtx"
 	"github.com/vicgarcia/tapes/internal/playback"
 )
@@ -36,12 +36,16 @@ func RecordingsHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid recording window (maximum 7 days)")
 		return
 	}
-	if !recordingCamera(w, r) {
+	if !requireCamera(w, r) {
 		return
 	}
-	rows, err := mediamtx.ListRecordings(r.Context(), mux.Vars(r)["camera"], start, end)
+	camera := mux.Vars(r)["camera"]
+	rows, err := mediamtx.ListRecordings(r.Context(), camera, start, end)
 	if err != nil {
-		jsonError(w, 502, "recordings unavailable")
+		if r.Context().Err() == nil {
+			logger.Error("recordings list failed", "camera", camera, "error", err)
+			jsonError(w, 502, "recordings unavailable")
+		}
 		return
 	}
 	spans := make([]span, 0, len(rows))
@@ -60,8 +64,7 @@ func RecordingsHandler(w http.ResponseWriter, r *http.Request) {
 			spans = append(spans, span{a.UTC().Format(timestampFormat), b.UTC().Format(timestampFormat), math.Round(b.Sub(a).Seconds()*1000) / 1000})
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(struct {
+	writeJSON(w, r, struct {
 		Spans []span `json:"spans"`
 	}{spans})
 }
@@ -82,7 +85,7 @@ func PlaybackHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid start or duration (1-600 seconds)")
 		return
 	}
-	if !recordingCamera(w, r) {
+	if !requireCamera(w, r) {
 		return
 	}
 	camera := mux.Vars(r)["camera"]
@@ -95,8 +98,12 @@ func PlaybackHandler(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, mediamtx.ErrNoRecording), errors.Is(err, playback.ErrEmpty):
 			jsonError(w, 404, "no recording at start")
 		case errors.Is(err, playback.ErrFull):
+			logger.Error("playback cache full", "camera", camera, "start", start, "duration", d)
 			jsonError(w, 503, "playback cache full")
+		case r.Context().Err() != nil:
+			// The client went away; the shared download continues for other readers.
 		default:
+			logger.Error("playback fetch failed", "camera", camera, "start", start, "duration", d, "error", err)
 			jsonError(w, 502, "playback unavailable")
 		}
 		return
@@ -112,19 +119,4 @@ func PlaybackHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "private, max-age=3600")
 	}
 	http.ServeContent(w, r, "clip.mp4", clip.FetchedAt(), clip)
-}
-
-func recordingCamera(w http.ResponseWriter, r *http.Request) bool {
-	all, err := cameras.GetAll()
-	if err != nil {
-		jsonError(w, 502, "mediamtx unavailable")
-		return false
-	}
-	for _, camera := range all {
-		if camera.Name == mux.Vars(r)["camera"] {
-			return true
-		}
-	}
-	jsonError(w, 404, "camera not found")
-	return false
 }

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { addDays, DAY, startOfDay } from '@app/lib/time';
+import { addDays, DAY, dayOfMonth, formatLongDate, formatWeekdayShort, startOfDay } from '@app/lib/time';
 
 // Horizontal strip of day tiles, newest first: weekday + date going back,
 // loading more days as it scrolls. Tiles are sized so a whole number of them
@@ -12,9 +12,6 @@ type DayChipsProps = {
 }
 
 const PAGE = 21;
-
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
-const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
 export function DayChips({ selected, onSelect, label = 'Day' }: DayChipsProps) {
     const today = startOfDay(Date.now());
@@ -46,16 +43,15 @@ export function DayChips({ selected, onSelect, label = 'Day' }: DayChipsProps) {
 
     return <div className="day-chips" ref={strip} role="group" aria-label={label}>
         {list.map(day => {
-            const date = new Date(day).getDate();
             return <button
                 key={day}
                 className={`day-chip${selected === day ? ' is-active' : ''}`}
                 onClick={() => onSelect(day)}
                 aria-pressed={selected === day}
-                aria-label={fullDate.format(day)}
+                aria-label={formatLongDate(day)}
             >
-                <span className="day-chip-top">{weekday.format(day)}</span>
-                <span className="day-chip-main">{date}</span>
+                <span className="day-chip-top">{formatWeekdayShort(day)}</span>
+                <span className="day-chip-main">{dayOfMonth(day)}</span>
             </button>;
         })}
         <span ref={sentinel} className="day-chips-end" aria-hidden="true" />
