@@ -25,11 +25,11 @@ curl -O https://raw.githubusercontent.com/vicgarcia/tapes/main/mediamtx.yml
 curl -o .env https://raw.githubusercontent.com/vicgarcia/tapes/main/.env.template
 ```
 
-Edit `.env` and set **both** `JWT_KEY` and `MEDIAMTX_PASS` to separate random secrets:
+Edit `.env` and set **both** `JWT_KEY` and `MEDIAMTX_PASS` to separate random secrets using `pwgen` (`-s` selects secure random generation):
 
 ```bash
-openssl rand -hex 32  # JWT_KEY
-openssl rand -hex 16  # MEDIAMTX_PASS
+pwgen -s 64 1  # JWT_KEY
+pwgen -s 32 1  # MEDIAMTX_PASS
 ```
 
 Compose gives the API and MediaMTX the same `MEDIAMTX_PASS`; the internal username is `tapes`. Optional `UID` and `GID` default to `1000:1000`. `TZ` defaults to UTC for tapes; MediaMTX uses the host's mounted timezone files. See [API.md](API.md) for API configuration.
