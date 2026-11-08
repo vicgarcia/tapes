@@ -15,11 +15,11 @@ The Go server listens on `:8671` and serves the built UI at `/`. There is no API
 
 | Method | Path | Result |
 | --- | --- | --- |
-| GET | `/health` | Public `{"status":"success"}`; process liveness, not MediaMTX readiness. |
+| GET | `/health` | Public `{"status":"success","timezone":"America/New_York"}`; process liveness, not MediaMTX readiness. `timezone` is the app time zone from `TZ`, which the UI uses for days and clock labels, so it is available before login. |
 | POST | `/login` | Form `username` and `password`; sets cookie and returns `{"status":"success"}`. Bad/missing credentials: 401; unreadable password file: 500. |
 | POST | `/logout` | Requires a valid cookie; clears it and returns `{"status":"success"}`. |
 | GET | `/auth` | Returns `{"status":"success"}` for a valid cookie. |
-| GET | `/cameras` | Array of cameras, sorted by name; cached for two seconds. MediaMTX failure: 502. |
+| GET | `/cameras` | Array of cameras, sorted by name; cached for two seconds. `video` comes from the first video track. MediaMTX failure, or no answer within five seconds: 502. |
 | GET | `/cameras/{camera}` | One camera; missing: 404; discovery failure: 502. |
 | GET | `/cameras/{camera}/snapshot` | On-demand JPEG; details below. |
 | GET | `/cameras/{camera}/recordings` | Recorded spans in the requested time window; details below. |
@@ -77,7 +77,7 @@ Invalid parameters return 400; unknown cameras or no recording at the requested 
 
 ### Live HLS
 
-The live route checks camera existence and proxies the corresponding MediaMTX HLS path. It forwards query parameters (including low-latency HLS requests), upstream headers, and response body. It rejects `..` path components with 400. Unknown/unavailable camera discovery produces 404 on this route; upstream connection failures and upstream 401/403 become 502. Other upstream statuses pass through. Redirects to a different host are not followed.
+The live route checks camera existence and proxies the corresponding MediaMTX HLS path. It forwards query parameters (including low-latency HLS requests) and the response body, with only `Content-Type`, `Content-Length`, `Cache-Control`, `Last-Modified` and `ETag` from the upstream headers. It rejects `..` path components with 400. An unknown camera returns 404, and unavailable camera discovery 502. Upstream connection failures, upstream 401/403, and redirects become 502; redirects are followed only back to the HLS host. Other upstream statuses pass through.
 
 There is no client timeout for live proxy requests. Reverse proxies must not buffer live responses; allow long reads. The browser uses native HLS when available and hls.js otherwise.
 
@@ -99,4 +99,6 @@ Environment values below configure the API process. The root `.env` is loaded by
 | `PLAYBACK_CACHE_MB` | `256` | In-memory clip budget in MiB; invalid/nonpositive values fall back to 256. |
 | `DEBUG` | `false` | Enables logger debug level for `true`, `1`, or `yes` (case-insensitive). |
 
-Compose also supports `UID`/`GID` (default 1000), `TZ` (default UTC for tapes), and the endpoint overrides above. Configure cameras, recording paths, and age-based retention in `mediamtx.yml`, not through the API. Neither the API nor the UI edits configuration or deletes recordings. See [README.md](README.md) for deployment, persistent storage, and upgrades.
+The server logs every request (method, path, query, status, bytes, duration, remote address) and every upstream or internal failure at error level. Requests are logged at info level, except successful live HLS playlists, parts and segments after the first `index.m3u8`, which a viewer fetches several times a second; those are logged at debug level. Request headers must arrive within 10 seconds and request bodies within 30, and login bodies are limited to 4 KB. There is no write timeout, because of live playlists and clip preparation. SIGTERM stops accepting connections and waits up to 5 seconds for requests in flight.
+
+Compose also supports `UID`/`GID` (default 1000), `TZ` (the app time zone, an IANA name, default UTC; an unknown name stops startup), and the endpoint overrides above. Configure cameras, recording paths, and age-based retention in `mediamtx.yml`, not through the API. Neither the API nor the UI edits configuration or deletes recordings. See [README.md](README.md) for deployment, persistent storage, and upgrades.

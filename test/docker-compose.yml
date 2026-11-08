@@ -18,6 +18,7 @@ services:
         aliases: [tapes]
     environment:
       JWT_KEY: test-key
+      TZ: America/New_York
       PASSWORDS_PATH: /passwords
       MEDIAMTX_API_URL: http://mediamtx:9997
       MEDIAMTX_PLAYBACK_URL: http://mediamtx:9996

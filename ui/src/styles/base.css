@@ -261,23 +261,6 @@ img { display: block; }
 .day-chip.is-active .day-chip-main { color: var(--accent-strong); }
 .day-chips-end { flex: 0 0 1px; }
 
-/* ---- camera strip (inside the player) ------------------------------------ */
-
-.camera-strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-bottom: 14px; padding-bottom: 2px; }
-.camera-strip::-webkit-scrollbar { display: none; }
-.mini-tile { flex: 0 0 auto; width: 132px; display: grid; gap: 5px; color: var(--text-2); }
-.mini-tile-image {
-    position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius-small); overflow: hidden;
-    background: var(--surface-2); border: 1px solid var(--border); display: grid; place-items: center; color: var(--text-3);
-}
-.mini-tile-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.mini-tile:hover .mini-tile-image { border-color: var(--border-strong); }
-.mini-tile.is-active .mini-tile-image { border: 2px solid var(--accent); background: var(--accent-bg); color: var(--accent-strong); }
-.mini-tile.is-offline .mini-tile-image img { filter: grayscale(1) brightness(0.6); }
-.mini-tile-watching { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 700; }
-.mini-tile-name { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-.mini-tile.is-active .mini-tile-name { color: var(--text); }
-
 /* ---- keyboard shortcuts -------------------------------------------------- */
 
 .modal-panel.shortcuts { width: min(520px, 100%); padding: 18px 22px 20px; }

@@ -4,12 +4,27 @@ tapes is the result of that journey. It's built around a straightforward idea: u
 
 This isn't trying to be a complete commercial NVR replacement with every feature imaginable. Instead, it's a solid foundation that handles the core job well—continuous recording with a clean web interface—and stays out of your way when you want to build on top of it. The system has been running in production for months, quietly doing its job while I've refined the pieces that matter.
 
-MediaMTX now handles both recording and native playback. There are no generated thumbnails or background file-processing jobs: camera previews are on-demand snapshots held in memory.
+MediaMTX now handles both recording and playback, and the web app is built around a continuous timeline: open a camera to watch it live, about a second behind, or scrub back through any day's recordings. There are no generated thumbnails or background file-processing jobs: camera previews are on-demand snapshots held in memory.
+
+## Screenshots
+
+The camera list and the viewer, on desktop and on a phone. These use generated test cameras.
+
+![Camera list on desktop, with three cameras](docs/screenshots/desktop-cameras.png)
+
+![Viewer on desktop, playing a camera live above the day tiles and timeline](docs/screenshots/desktop-viewer.png)
+
+<p align="center">
+  <img src="docs/screenshots/mobile-cameras.png" width="280" alt="Camera list on a phone, with three cameras">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/mobile-viewer.png" width="280" alt="Viewer on a phone, with the timeline and controls below the video">
+</p>
 
 ## Overview
 
 - **MediaMTX** pulls RTSP camera streams, records fragmented MP4, serves live HLS and recorded MP4, and expires old recordings.
 - **tapes** is a Go API with an embedded React/TypeScript UI. It discovers cameras through MediaMTX, authenticates viewers, and proxies video. ffmpeg captures on-demand JPEG previews.
+- **The web app** shows each camera's current picture, live video about a second behind, and a timeline of each day's recordings with zoom, 1×/2×/4× playback and keyboard shortcuts. Days and times use the app time zone (`TZ`), and on phones it installs as a home-screen app.
 - **Storage** belongs to MediaMTX only. The tapes container does not need a recordings mount or a database.
 
 ## Setup
@@ -32,7 +47,7 @@ pwgen -s 64 1  # JWT_KEY
 pwgen -s 32 1  # MEDIAMTX_PASS
 ```
 
-Compose gives the API and MediaMTX the same `MEDIAMTX_PASS`; the internal username is `tapes`. Optional `UID` and `GID` default to `1000:1000`. `TZ` defaults to UTC for tapes; MediaMTX uses the host's mounted timezone files. See [API.md](API.md) for API configuration.
+Compose gives the API and MediaMTX the same `MEDIAMTX_PASS`; the internal username is `tapes`. Optional `UID` and `GID` default to `1000:1000`. Set `TZ` to the cameras' time zone, such as `America/New_York`: the timeline's days, the clock and tapes' logs use it whatever zone a viewer's device is in. It defaults to UTC, and an unknown name stops tapes at startup. MediaMTX uses the host's mounted timezone files for its own logs. See [API.md](API.md) for API configuration.
 
 ### 2. Create the password file
 
@@ -45,7 +60,7 @@ htpasswd passwords viewer  # optional additional user; do not use -c again
 
 The supplied Compose file mounts `./passwords` read-only at `/opt/tapes/passwords`. Ensure the configured container user can read it.
 
-### 3. Add cameras and persistent storage
+### 3. Add cameras and storage
 
 Edit `paths` in `mediamtx.yml`:
 
@@ -57,15 +72,13 @@ paths:
     source: rtsp://user:password@192.168.1.102:554/live/ch0
 ```
 
-Add a persistent recordings mount to the **mediamtx** service in `docker-compose.yml` (the downloaded file does not include one):
+The supplied Compose file records to `./data/cameras`. Create it as the user that will own recordings (the `UID`/`GID` in `.env`), because Docker creates a missing folder owned by root and MediaMTX then can't write to it:
 
-```yaml
-    volumes:
-      # Keep the existing timezone and mediamtx.yml mounts too.
-      - /srv/tapes/recordings:/cameras
+```bash
+mkdir -p data/cameras
 ```
 
-Make the parent storage directory writable by the configured UID/GID. **Do not create individual camera folders**; MediaMTX creates them. Do not add this mount to tapes.
+To record to another disk, change that mount on the **mediamtx** service, for example `- /srv/tapes/recordings:/cameras`, and make that folder writable by the same user. **Do not create individual camera folders**; MediaMTX creates them. Do not add this mount to tapes.
 
 Defaults record five-minute fMP4 segments, flushing parts every second, at `/cameras/%path/%Y%m%d%H%M%S-%f%z.mp4`. The fractional seconds are required for playback; the timezone offset distinguishes repeated local times at the end of daylight saving time.
 
@@ -91,7 +104,7 @@ On HTTPS (or localhost), supported browsers can install tapes as a home-screen a
 
 MediaMTX is the **only** thing that deletes recordings, using `recordDeleteAfter` in `mediamtx.yml`. Deletion is by age only, with **no disk limit**. The default is `90d`; use `0s` to keep forever. It only cleans cameras still listed in `mediamtx.yml`, so a removed camera's folder must be deleted by hand.
 
-Check free disk space regularly (`df -h /srv/tapes/recordings`) and size storage for the aggregate bitrate and retention period. A continuous 2–4 Mbps stream uses roughly 22–43 GB per day per camera, before overhead. The UI does not manage retention or remove files.
+Check free disk space regularly (`df -h data/cameras`, or your own recordings path) and size storage for the aggregate bitrate and retention period. A continuous 2–4 Mbps stream uses roughly 22–43 GB per day per camera, before overhead. The UI does not manage retention or remove files.
 
 ## Reverse proxy
 
@@ -120,8 +133,8 @@ Keep the API and media routes on the same origin; authentication uses a cookie. 
 ## Upgrading from the older recording layout
 
 1. Back up configuration, credentials, and recordings, then stop the stack (`docker compose down`).
-2. Download the new `docker-compose.yml` and `mediamtx.yml`. Move your camera paths into the new MediaMTX configuration and restore the persistent recordings mount on MediaMTX only. Preserve any other deployment-specific settings deliberately.
-3. Set `MEDIAMTX_PASS` in `.env` and keep a strong `JWT_KEY`.
+2. Download the new `docker-compose.yml` and `mediamtx.yml`. Move your camera paths into the new MediaMTX configuration. The new Compose file mounts `./data/cameras` on MediaMTX only; point it at your existing recordings folder if they live elsewhere. Preserve any other deployment-specific settings deliberately.
+3. Set `MEDIAMTX_PASS` in `.env` and keep a strong `JWT_KEY`. Set `TZ` to the cameras' time zone: the timeline used each viewer's device zone before, and now uses `TZ`, which defaults to UTC.
 4. If you changed `RETENTION_DAYS`, set the same period in `recordDeleteAfter` (for example, `30d`). The old variable is ignored; the new default is 90 days. An old value of `0` becomes `0s`, keeping recordings forever.
 5. Download `scripts/migrate-recordings.sh` from this repository and run it while the stack is stopped, with `TZ` set to the zone recordings were written in. Start with a dry run:
 
@@ -135,7 +148,7 @@ Keep the API and media routes on the same origin; authentication uses a cookie. 
 
 ## Development
 
-The repository contains `api/` (Go), `ui/` (React/TypeScript), and `test/` (disposable integration stack). [CLAUDE.md](CLAUDE.md) covers architecture and development constraints; [API.md](API.md) documents the HTTP interface.
+The repository contains `api/` (Go), `ui/` (React/TypeScript), and `test/` (disposable integration stack). [AGENTS.md](AGENTS.md) covers architecture and development constraints; [API.md](API.md) documents the HTTP interface.
 
 ```bash
 git clone https://github.com/vicgarcia/tapes.git

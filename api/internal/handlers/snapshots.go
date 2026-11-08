@@ -22,7 +22,7 @@ func SnapshotHandler(w http.ResponseWriter, r *http.Request) {
 
 func serveSnapshot(w http.ResponseWriter, r *http.Request, service *snapshots.Service) {
 	w.Header().Set("Cache-Control", "no-store")
-	if !recordingCamera(w, r) {
+	if !requireCamera(w, r) {
 		return
 	}
 	snapshot, err := service.Get(r.Context(), mux.Vars(r)["camera"])
