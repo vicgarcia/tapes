@@ -1,0 +1,4 @@
+# Settings for this repo's factory. Defaults and every option are in the software-factory repo, templates/config.yml.
+
+# Agent PRs target dev, which is promoted to main outside the factory.
+branch: dev

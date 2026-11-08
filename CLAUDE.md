@@ -37,16 +37,16 @@ Read [AGENTS.md](AGENTS.md) for repository conventions, [README.md](README.md) f
 
 Everything the project builds or tests runs in containers. Do not install dependencies directly into the checkout. `test.sh` copies sources into disposable container volumes and tears down its resources.
 
-In the Software Factory use:
+Run the tests with:
 
 ```bash
-factory-test ui     # TypeScript/Vite build, ESLint, Node tests
-factory-test api    # Go vet and race tests with an embed fixture
-factory-test stack  # Production image and synthetic RTSP integration stack
-factory-test       # Full suite; required before pushing
+./test.sh ui     # TypeScript/Vite build, ESLint, Node tests
+./test.sh api    # Go vet and race tests with an embed fixture
+./test.sh stack  # Production image and synthetic RTSP integration stack
+./test.sh        # Full suite; required before pushing
 ```
 
-Outside the factory the equivalent entry point is `./test.sh [ui|api|stack]`. The stack stage uses a synthetic ffmpeg publisher and checks health/authentication, camera metadata, snapshots, HLS, recording spans, and MP4 ranges/HEAD. Tests must stay deterministic and use this isolated stack rather than real cameras. UI tests live in `ui/test/`, Go tests next to their packages, and shell assertion tests in `test/`.
+The stack stage uses a synthetic ffmpeg publisher and checks health/authentication, camera metadata, snapshots, HLS, recording spans, and MP4 ranges/HEAD. Tests must stay deterministic and use this isolated stack rather than real cameras. UI tests live in `ui/test/`, Go tests next to their packages, and shell assertion tests in `test/`.
 
 For UI iteration use a Node container with dependencies on a container volume. Vite proxies API routes to `TAPES_API_URL` (default `http://localhost:8671` as seen from the UI container). The production Dockerfile supplies the embedded UI automatically; standalone Go compilation needs an `api/dist` directory first. Do not commit build output or screenshots.
 

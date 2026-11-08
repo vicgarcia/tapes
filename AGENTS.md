@@ -32,12 +32,13 @@ Tapes is a camera-recording application with a Go backend in `api/`, a React/Typ
 
 ## Testing and review
 - Add or update tests for behavior changes and edge cases. Keep tests deterministic and isolated; rely on external services only when the repository's integration setup provides them.
-- Go sources are under `api/`. Use `factory-test ui`, `factory-test api`, or `factory-test stack` while working, and the full `factory-test` run before pushing. These forward to `./test.sh [ui|api|stack]`; no argument runs everything. Do not run project tests directly outside that workflow.
+- Go sources are under `api/`. Run `./test.sh ui`, `./test.sh api`, or `./test.sh stack` while working, and the full `./test.sh` before pushing; no argument runs everything. It runs in containers with disposable resources, and concurrent runs are isolated from each other.
 - Review `git diff` for correctness, scope, formatting, and stale comments before committing. Avoid generated files or unrelated formatting changes unless required.
 
 ## Repository map
 - `api/main.go`: HTTP routes and service startup.
 - `api/internal/`: authentication, camera discovery, HTTP handlers, logging, media operations, and environment helpers.
 - `ui/`: React/TypeScript client.
-- `test.sh`, `test/`, and `.factory/`: integration test setup and project test workflow.
+- `test.sh` and `test/`: the test suite and its disposable integration stack.
+- `.factory/`: the Software Factory setup for this repo.
 - `Dockerfile`, `docker-compose.yml`, and `mediamtx.yml`: build and deployment configuration.

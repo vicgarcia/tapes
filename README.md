@@ -144,7 +144,7 @@ cd tapes
 ./test.sh ui     # or api / stack
 ```
 
-Tests require Docker/Compose and run dependencies and builds in containers with disposable volumes, without installing dependencies into the checkout. In the Software Factory, use `factory-test [ui|api|stack]` instead; it holds the test lock and invokes `test.sh`.
+Tests require Docker/Compose and run dependencies and builds in containers with disposable volumes, without installing dependencies into the checkout.
 
 `docker build -t tapes:local .` builds the production image: Node builds the UI, Go embeds `api/dist`, and Alpine supplies ffmpeg. To deploy that build, explicitly change the tapes image in Compose to `tapes:local`.
 

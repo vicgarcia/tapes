@@ -7,21 +7,16 @@ services:
     privileged: true
     restart: unless-stopped
     stop_grace_period: 60s
-    # GH_TOKEN comes from the shell, and from .env instead if that sets it.
+    # Optional per-machine settings, git-ignored, from templates/.env. The repo's own settings go in config.yml.
     env_file:
       - path: .env
         required: false
-    # Optional settings are listed in the software-factory repo, in docs/using.md.
-    environment:
-      - FACTORY_HOST_TOKEN=${GH_TOKEN:-}
-    #   - PI_MODEL=openai-codex/<model>
-    #   - PI_REVIEW_MODEL=openai-codex/<model>
     volumes:
       # This clone. Agents work in worktrees under .worktrees/.
       - ..:/workspace
       # The factory's databases and logs, git-ignored.
       - ./state:/state
-      # The model login: auth.json in a folder every repo's factory shares. FACTORY_AUTH_DIR=. in .env keeps it in .factory/.
+      # The model login and the GitHub App's credentials, in a folder every repo's factory on this machine shares.
       - ${FACTORY_AUTH_DIR:-~/.factory}:/auth
       # A named volume, because a Windows bind can't back the overlay driver.
       - docker-data:/var/lib/docker
