@@ -181,3 +181,146 @@ test('playhead emits at 80ms intervals, with jumps immediate; detach invalidates
         assert.ok(engine.slots.every(slot => slot.clip === null));
     } finally { engine.detach(); }
 });
+
+const flush = () => new Promise(resolve => setImmediate(resolve));
+function unavailable() {
+    globalThis.fetch = async () => new Response('{"error":"recordings unavailable"}', { status: 502 });
+}
+function empty() {
+    globalThis.fetch = async () => new Response('{"spans":[]}');
+}
+
+test('failed availability seek keeps its target for retry; only successful empty spans mean end', async () => {
+    const { engine, videos: [, , b] } = setup();
+    try {
+        unavailable();
+        await engine.seek(target);
+        assert.equal(engine.getState().status, 'error');
+        assert.equal(engine.getState().time, target);
+        assert.equal(engine.getState().notice, null);
+        assert.equal(b.src, '');
+        spans();
+        await engine.seek(engine.getState().time, true);
+        ready(b);
+        assert.equal(engine.getState().status, 'ready');
+        assert.equal(engine.getState().time, target);
+        assert.equal(b.paused, false);
+        empty();
+        await engine.seek(target - 100000);
+        assert.equal(engine.getState().status, 'end');
+        assert.match(engine.getState().notice.text, /No recordings after/);
+    } finally { engine.detach(); }
+});
+
+test('preload failure leaves playback healthy, continuation failure offers retry at the window end', async () => {
+    spans();
+    const { engine, videos: [, a, b] } = setup();
+    try {
+        await engine.seek(target);
+        ready(b);
+        unavailable();
+        b.currentTime = 50;
+        engine.sample();
+        await flush();
+        assert.equal(engine.getState().status, 'ready');
+        assert.equal(b.paused, false);
+        assert.equal(a.src, '');
+        b.currentTime = b.duration;
+        b.fire('ended');
+        await flush();
+        const endedAt = target + 60000;
+        assert.equal(engine.getState().status, 'error');
+        assert.equal(engine.getState().time, endedAt);
+        assert.equal(engine.getState().notice, null);
+        spans();
+        await engine.seek(engine.getState().time, true);
+        ready(a);
+        assert.equal(engine.getState().status, 'ready');
+        assert.equal(engine.getState().time, endedAt);
+        empty();
+        a.currentTime = a.duration;
+        a.fire('ended');
+        await flush();
+        assert.equal(engine.getState().status, 'end');
+        assert.equal(engine.getState().notice.text, 'End of recordings');
+    } finally { engine.detach(); }
+});
+
+for (const result of ['failure', 'empty']) {
+    test(`clip-error availability ${result} is handled without escaping the event handler`, async () => {
+        spans();
+        const { engine, videos: [, , b] } = setup();
+        try {
+            await engine.seek(target);
+            if (result === 'failure') unavailable(); else empty();
+            b.fire('error');
+            await flush();
+            assert.equal(engine.getState().status, result === 'failure' ? 'error' : 'end');
+            assert.equal(engine.getState().time, target);
+            assert.equal(engine.getState().notice, null);
+            if (result === 'failure') {
+                spans();
+                await engine.seek(engine.getState().time, true);
+                ready(b);
+                assert.equal(engine.getState().status, 'ready');
+                assert.equal(engine.getState().time, target);
+            }
+        } finally { engine.detach(); }
+    });
+}
+
+for (const outcome of ['cancelled', 'failure', 'playable', 'empty']) {
+    for (const path of ['seek', 'clip-error', 'preload', 'ended']) {
+        for (const change of ['seek', 'live', 'detach']) {
+            test(`stale ${path} ${outcome} cannot override ${change}`, async () => {
+                spans();
+                const { engine, videos: [, , b] } = setup();
+                try {
+                    if (path !== 'seek') { await engine.seek(target); ready(b); }
+                    let settle;
+                    globalThis.fetch = () => new Promise((resolve, reject) => {
+                        settle = () => outcome === 'cancelled'
+                            ? reject(new DOMException('cancelled', 'AbortError'))
+                            : outcome === 'failure'
+                                ? resolve(new Response('{}', { status: 502 }))
+                                : resolve(new Response(JSON.stringify({ spans: outcome === 'empty' ? [] : [{
+                                start: new Date(target - 100000).toISOString(), end: new Date(target + 600000).toISOString(),
+                            }] })));
+                    });
+                    let pending;
+                    if (path === 'seek') pending = engine.seek(target - 100000);
+                    if (path === 'clip-error') b.fire('error');
+                    if (path === 'preload') pending = engine.preloadNext();
+                    if (path === 'ended') pending = engine.onEnded();
+                    assert.ok(settle);
+                    if (change === 'seek') { spans(); await engine.seek(target - 200000); }
+                    if (change === 'live') engine.goLive();
+                    if (change === 'detach') engine.detach();
+                    const state = engine.getState();
+                    settle();
+                    await pending;
+                    await flush();
+                    assert.deepEqual(engine.getState(), state);
+                } finally { engine.detach(); }
+            });
+        }
+    }
+}
+
+test('availability authentication failures still dispatch unauthorized', async () => {
+    globalThis.CustomEvent ??= class CustomEvent extends Event {};
+    const { engine } = setup();
+    let unauthorized = 0;
+    const onUnauthorized = () => unauthorized++;
+    window.addEventListener('unauthorized', onUnauthorized);
+    try {
+        globalThis.fetch = async () => new Response('{}', { status: 401 });
+        await engine.seek(target);
+        assert.equal(unauthorized, 1);
+        assert.equal(engine.getState().status, 'error');
+        assert.equal(engine.getState().notice, null);
+    } finally {
+        window.removeEventListener('unauthorized', onUnauthorized);
+        engine.detach();
+    }
+});

@@ -187,7 +187,13 @@ export class PlayerEngine {
             return;
         }
 
-        const playable = await this.findPlayable(target);
+        let playable: Playable | null;
+        try {
+            playable = await this.findPlayable(target);
+        } catch {
+            this.recordingsFailed(gen);
+            return;
+        }
         if (gen !== this.generation) return;
         if (playable === null) {
             this.patch({ status: 'end', time: target });
@@ -266,17 +272,20 @@ export class PlayerEngine {
 
     /** First recorded moment at or after `t`, from fresh span data. */
     private async findPlayable(t: number): Promise<Playable | null> {
-        try {
-            const spans = await getSpans(this.camera, t - PRE_ROLL_MS - SECOND, Math.min(t + 24 * HOUR, Date.now() + HOUR));
-            for (const span of spans) {
-                const spanStart = span.start + SPAN_START_SLACK_MS;
-                const at = Math.max(spanStart, t);
-                if (span.end - at > 500) return { at, spanStart };
-            }
-            return null;
-        } catch {
-            return null;
+        const spans = await getSpans(this.camera, t - PRE_ROLL_MS - SECOND, Math.min(t + 24 * HOUR, Date.now() + HOUR));
+        for (const span of spans) {
+            const spanStart = span.start + SPAN_START_SLACK_MS;
+            const at = Math.max(spanStart, t);
+            if (span.end - at > 500) return { at, spanStart };
         }
+        return null;
+    }
+
+    private recordingsFailed(gen: number) {
+        if (gen !== this.generation || this.state.type !== 'playback') return;
+        this.ending = false;
+        this.patch({ status: 'error', notice: null });
+        this.applyPlay();
     }
 
     private load(index: number, clip: Clip, offset: number, activate: boolean) {
@@ -353,7 +362,7 @@ export class PlayerEngine {
                 if (p === null) return this.patch({ status: 'end' });
                 const length = Math.min(Date.now(), p.at + FIRST_WINDOW_MS) - p.at;
                 this.load(index, makeClip(this.camera, p.at, length / 1000), 0, true);
-            });
+            }).catch(() => this.recordingsFailed(gen));
         });
     }
 
@@ -413,7 +422,14 @@ export class PlayerEngine {
         // the clip runs up to (almost) now: what comes next is still being
         // recorded, maybePreload looks again in a few seconds
         if (from + LIVE_EDGE_MS + 6 * SECOND > Date.now()) return;
-        const playable = await this.findPlayable(from);
+        let playable: Playable | null;
+        try {
+            playable = await this.findPlayable(from);
+        } catch {
+            // Speculative failure must not interrupt the active clip. onEnded
+            // checks again and presents an error if continuation is unavailable.
+            return;
+        }
         if (gen !== this.generation || this.slots[1 - this.active].phase !== 'idle') return;
         if (playable === null) return;   // nothing after this clip yet; looked for again, and onEnded checks too
         const length = Math.min(NEXT_WINDOW_S, (Date.now() - playable.at) / 1000);
@@ -447,7 +463,13 @@ export class PlayerEngine {
         // no next window queued (span data was behind, or the preload failed)
         const gen = this.generation;
         this.patch({ status: 'buffering', time: endedAt });
-        const playable = await this.findPlayable(endedAt);
+        let playable: Playable | null;
+        try {
+            playable = await this.findPlayable(endedAt);
+        } catch {
+            this.recordingsFailed(gen);
+            return;
+        }
         if (gen !== this.generation) return;
         this.ending = false;
         if (playable === null) {
