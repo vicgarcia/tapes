@@ -190,6 +190,7 @@ function empty() {
     globalThis.fetch = async () => new Response('{"spans":[]}');
 }
 
+/** Only a successful lookup can establish that footage is absent; a failed lookup must remain retryable. */
 test('failed availability seek keeps its target for retry; only successful empty spans mean end', async () => {
     const { engine, videos: [, , b] } = setup();
     try {
@@ -212,6 +213,7 @@ test('failed availability seek keeps its target for retry; only successful empty
     } finally { engine.detach(); }
 });
 
+/** Availability becomes user-visible only when the next window is needed, with retry anchored to its boundary. */
 test('preload failure leaves playback healthy, continuation failure offers retry at the window end', async () => {
     spans();
     const { engine, videos: [, a, b] } = setup();
@@ -246,6 +248,7 @@ test('preload failure leaves playback healthy, continuation failure offers retry
     } finally { engine.detach(); }
 });
 
+/** Clip-load recovery must distinguish unavailable span data from confirmed missing footage. */
 for (const result of ['failure', 'empty']) {
     test(`clip-error availability ${result} is handled without escaping the event handler`, async () => {
         spans();
@@ -269,6 +272,7 @@ for (const result of ['failure', 'empty']) {
     });
 }
 
+/** Settle each lookup after its generation expires to catch stale mutations and unhandled rejections. */
 for (const outcome of ['cancelled', 'failure', 'playable', 'empty']) {
     for (const path of ['seek', 'clip-error', 'preload', 'ended']) {
         for (const change of ['seek', 'live', 'detach']) {
@@ -307,6 +311,7 @@ for (const outcome of ['cancelled', 'failure', 'playable', 'empty']) {
     }
 }
 
+/** Playback error handling must not suppress the shared unauthorized event that ends the session. */
 test('availability authentication failures still dispatch unauthorized', async () => {
     globalThis.CustomEvent ??= class CustomEvent extends Event {};
     const { engine } = setup();
