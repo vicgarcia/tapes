@@ -272,7 +272,9 @@ export class PlayerEngine {
 
     /** First recorded moment at or after `t`, from fresh span data. */
     private async findPlayable(t: number): Promise<Playable | null> {
-        const spans = await getSpans(this.camera, t - PRE_ROLL_MS - SECOND, Math.min(t + 24 * HOUR, Date.now() + HOUR));
+        const start = t - PRE_ROLL_MS - SECOND;
+        const end = Math.min(t + 24 * HOUR, Date.now() + HOUR);
+        const spans = await getSpans(this.camera, start, end);
         for (const span of spans) {
             const spanStart = span.start + SPAN_START_SLACK_MS;
             const at = Math.max(spanStart, t);
